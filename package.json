@@ -1,13 +1,16 @@
 {
   "name": "puzldai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Multi-LLM Orchestrator - Route tasks intelligently across Claude, Gemini, Codex, and local models",
   "type": "module",
   "bin": {
     "puzld": "./dist/cli/index.js",
     "puzldai": "./dist/cli/index.js"
   },
-  "files": ["dist", "web"],
+  "files": [
+    "dist",
+    "web"
+  ],
   "scripts": {
     "dev": "bun run src/cli/index.ts",
     "build": "bun build src/cli/index.ts --outdir dist/cli --target node --packages external && chmod +x dist/cli/index.js",
@@ -39,6 +42,14 @@
     "type": "git",
     "url": "https://github.com/MedChaouch/Puzld.ai.git"
   },
-  "keywords": ["ai", "llm", "claude", "gemini", "codex", "ollama", "orchestrator"],
+  "keywords": [
+    "ai",
+    "llm",
+    "claude",
+    "gemini",
+    "codex",
+    "ollama",
+    "orchestrator"
+  ],
   "license": "AGPL-3.0-only"
 }
