@@ -180,11 +180,12 @@ Describe the goal. AI analyzes the task, builds a multi-step plan, and executes 
 ```bash
 # TUI
 /autopilot "build a todo app with authentication"
-/execute                # Toggle auto-execution on/off
+/execute                       # Toggle auto-execution on/off
 
 # CLI
-puzld plan "task"       # Generate plan only
-puzld plan "task" -x    # Generate and execute
+puzld plan "task"              # Generate plan only
+puzld plan "task" -x           # Generate and execute
+puzld plan "task" -p claude    # Use specific agent as planner
 ```
 
 <p align="center">
