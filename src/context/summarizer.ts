@@ -212,13 +212,18 @@ export async function extractKeyPoints(text: string): Promise<string[]> {
 }
 
 /**
- * Check if Ollama is available for summarization
+ * Check if summarizer (Ollama) is available
  */
 export async function isSummarizerAvailable(): Promise<boolean> {
+  const config = getConfig();
+  if (!config.adapters.ollama.enabled) return false;
+
   try {
-    const ollama = getOllama();
-    await ollama.list();
-    return true;
+    const response = await fetch(
+      `${config.adapters.ollama.host}/api/tags`,
+      { signal: AbortSignal.timeout(2000) }
+    );
+    return response.ok;
   } catch {
     return false;
   }

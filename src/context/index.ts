@@ -38,3 +38,16 @@ export {
   type ContextConfig,
   type AgentContextRules
 } from './manager';
+
+// Pipeline Memory
+export {
+  createMemoryContext,
+  addStepResultWithMemory,
+  injectVariablesTokenSafe,
+  getMemoryStats,
+  getStepOutputForBudget,
+  clearMemory,
+  type StepOutput,
+  type MemoryContext,
+  type MemoryConfig
+} from './pipeline-memory';
