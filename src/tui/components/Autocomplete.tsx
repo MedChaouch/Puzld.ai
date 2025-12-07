@@ -24,6 +24,9 @@ const COMMANDS: Command[] = [
   { label: '/interactive', value: '/interactive', description: 'Toggle: pause between steps' },
   // Nested
   { label: '/workflows', value: '/workflows', description: 'Manage workflows (interactive)' },
+  // Sessions
+  { label: '/session', value: '/session ', description: 'Session management' },
+  { label: '/sessions', value: '/sessions', description: 'List all sessions' },
   // Utility
   { label: '/help', value: '/help', description: 'Show available commands' },
   { label: '/clear', value: '/clear', description: 'Clear chat history' },

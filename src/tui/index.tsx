@@ -20,6 +20,17 @@ import { CompareView } from './components/CompareView';
 import { generatePlan } from '../executor/planner';
 import { isRouterAvailable } from '../router/router';
 import { adapters } from '../adapters';
+import {
+  getLatestSession,
+  addMessage as addSessionMessage,
+  listSessions,
+  createSession,
+  loadSession,
+  deleteSession,
+  clearSessionHistory,
+  getSessionStats,
+  type AgentSession
+} from '../memory';
 
 interface Message {
   id: string;
@@ -67,6 +78,7 @@ function App() {
   const [compareKey, setCompareKey] = useState(0); // Increments to reset CompareView state
   const [notification, setNotification] = useState<string | null>(null);
   const [agentStatus, setAgentStatus] = useState<AgentStatus[]>([]);
+  const [session, setSession] = useState<AgentSession | null>(null);
 
   // Value options
   const [currentAgent, setCurrentAgent] = useState('auto');
@@ -104,6 +116,24 @@ function App() {
     };
     checkAgents();
   }, []);
+
+  // Load session for current agent
+  useEffect(() => {
+    const sess = getLatestSession(currentAgent);
+    setSession(sess);
+    // Restore messages from session
+    if (sess.messages.length > 0) {
+      const restored: Message[] = sess.messages.map((m, i) => ({
+        id: String(i),
+        role: m.role === 'system' ? 'assistant' : m.role,
+        content: m.content
+      }));
+      setMessages(restored);
+    } else {
+      setMessages([]);
+    }
+    messageId = sess.messages.length;
+  }, [currentAgent]);
 
   // Handle workflow run from WorkflowsManager
   const handleWorkflowRun = async (workflowName: string, task: string) => {
@@ -245,23 +275,42 @@ function App() {
     setLoading(true);
     setLoadingText('thinking...');
 
+    // Persist user message to session
+    let currentSession = session;
+    if (currentSession) {
+      currentSession = await addSessionMessage(currentSession, 'user', value);
+      setSession(currentSession);
+    }
+
     try {
       const result = await orchestrate(value, { agent: currentAgent });
+      const responseContent = result.content || result.error || 'No response';
       setMessages(prev => [
         ...prev,
         {
           id: nextId(),
           role: 'assistant',
-          content: result.content || result.error || 'No response',
+          content: responseContent,
           agent: result.model,
           duration: result.duration
         }
       ]);
+      // Persist assistant message to session
+      if (currentSession) {
+        currentSession = await addSessionMessage(currentSession, 'assistant', responseContent);
+        setSession(currentSession);
+      }
     } catch (err) {
+      const errorMsg = 'Error: ' + (err as Error).message;
       setMessages(prev => [
         ...prev,
-        { id: nextId(), role: 'assistant', content: 'Error: ' + (err as Error).message }
+        { id: nextId(), role: 'assistant', content: errorMsg }
       ]);
+      // Persist error to session
+      if (currentSession) {
+        currentSession = await addSessionMessage(currentSession, 'assistant', errorMsg);
+        setSession(currentSession);
+      }
     }
 
     setLoading(false);
@@ -295,6 +344,12 @@ Options:
   /execute          - Toggle: auto-run autopilot plans
   /interactive      - Toggle: pause between steps
 
+Sessions:
+  /session          - Session management help
+  /session new      - Start new session
+  /session info     - Current session stats
+  /sessions [agent] - List all sessions
+
 Utility:
   /help   - Show this help
   /clear  - Clear chat history
@@ -315,7 +370,123 @@ Compare View:
 
       case 'clear':
         setMessages([]);
+        if (session) {
+          const cleared = clearSessionHistory(session);
+          setSession(cleared);
+        }
+        messageId = 0;
         break;
+
+      case 'sessions': {
+        const allSessions = listSessions(rest || undefined);
+        if (allSessions.length === 0) {
+          addMessage('No sessions found.');
+        } else {
+          let output = 'Sessions' + (rest ? ' (' + rest + ')' : '') + ':\n\n';
+          allSessions.forEach((s, i) => {
+            const date = new Date(s.updatedAt).toLocaleDateString();
+            output += (i + 1) + '. ' + s.id + '\n';
+            output += '   Agent: ' + s.agent + ' | Messages: ' + s.messageCount + ' | ' + date + '\n';
+            output += '   ' + s.preview + '\n\n';
+          });
+          addMessage(output);
+        }
+        break;
+      }
+
+      case 'session': {
+        const subCmd = rest.split(' ')[0];
+        const sessionArg = rest.split(' ').slice(1).join(' ');
+
+        // Helper to restore messages from session
+        const restoreFromSession = (sess: AgentSession) => {
+          if (sess.messages.length > 0) {
+            const restored: Message[] = sess.messages.map((m, i) => ({
+              id: String(i),
+              role: m.role === 'system' ? 'assistant' : m.role,
+              content: m.content
+            }));
+            setMessages(restored);
+            messageId = restored.length;
+          } else {
+            setMessages([]);
+            messageId = 0;
+          }
+        };
+
+        switch (subCmd) {
+          case 'new': {
+            const freshSession = createSession(currentAgent);
+            setSession(freshSession);
+            setMessages([]);
+            messageId = 0;
+            addMessage('New session created: ' + freshSession.id);
+            break;
+          }
+
+          case 'load': {
+            if (!sessionArg) {
+              addMessage('Usage: /session load <session_id>');
+              break;
+            }
+            const loaded = loadSession(sessionArg);
+            if (!loaded) {
+              addMessage('Session not found: ' + sessionArg);
+              break;
+            }
+            setSession(loaded);
+            restoreFromSession(loaded);
+            addMessage('Loaded session: ' + loaded.id);
+            break;
+          }
+
+          case 'delete': {
+            if (!sessionArg) {
+              addMessage('Usage: /session delete <session_id>');
+              break;
+            }
+            if (deleteSession(sessionArg)) {
+              addMessage('Deleted session: ' + sessionArg);
+              if (session?.id === sessionArg) {
+                const freshSession = createSession(currentAgent);
+                setSession(freshSession);
+                setMessages([]);
+                messageId = 0;
+              }
+            } else {
+              addMessage('Session not found: ' + sessionArg);
+            }
+            break;
+          }
+
+          case 'info': {
+            if (!session) {
+              addMessage('No active session');
+              break;
+            }
+            const stats = getSessionStats(session);
+            addMessage(
+              'Session: ' + session.id + '\n' +
+              'Agent: ' + session.agent + '\n' +
+              'Messages: ' + stats.messageCount + '\n' +
+              'Tokens: ' + stats.totalTokens + ' (summary: ' + stats.summaryTokens + ')\n' +
+              'Compression: ' + stats.compressionRatio + '%'
+            );
+            break;
+          }
+
+          default:
+            addMessage(
+              'Session commands:\n' +
+              '  /session new        - Start new session\n' +
+              '  /session load <id>  - Load a session\n' +
+              '  /session delete <id> - Delete a session\n' +
+              '  /session info       - Current session info\n' +
+              '  /sessions [agent]   - List all sessions'
+            );
+        }
+        break;
+      }
 
       case 'exit':
         process.exit(0);
