@@ -108,7 +108,15 @@ Run the same prompt on multiple agents and compare results side-by-side.
 Three views: **side-by-side**, **expanded**, or **stacked**.
 
 ```bash
-puzld compare claude,gemini "explain async/await"
+# TUI
+/compare claude,gemini "explain async/await"
+/sequential                    # Toggle: run one-at-a-time
+/pick                          # Toggle: select best response
+
+# CLI
+puzld compare claude,gemini "task"
+puzld compare claude,gemini,codex "task" -s   # Sequential mode
+puzld compare claude,gemini "task" -p         # Pick best response
 ```
 
 <p align="center">
@@ -139,6 +147,7 @@ Chain multiple agents together for complex tasks. Each agent handles a specific 
 
 ```bash
 puzld run "build a REST API" -P "gemini:analyze,claude:code,gemini:review"
+puzld run "task" -P "claude:plan,codex:code" -i   # Interactive: pause between steps
 ```
 
 <p align="center">
@@ -154,9 +163,13 @@ Save pipelines as reusable templates. Run them anywhere with a single command.
 ```bash
 # TUI
 /workflow code-review "my code here"
+/workflows                     # Manage templates (interactive)
+/interactive                   # Toggle: pause between steps
 
 # CLI
 puzld run "task" -T code-review
+puzld template list            # List all templates
+puzld template create my-flow -P "claude:plan,codex:code"
 ```
 
 <p align="center">
