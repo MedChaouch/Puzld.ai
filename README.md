@@ -107,12 +107,12 @@ Run the same prompt on multiple agents and compare results side-by-side.
 
 ## Features
 
-**Auto-routing** — Task analyzed locally, routed to best agent
-**Compare** — Same prompt, multiple agents, side-by-side results
-**Pipelines** — Chain agents: `gemini:analyze → claude:code → ollama:review`
-**Workflows** — Save pipelines as reusable templates
-**Autopilot** — AI generates the execution plan for you
-**TUI** — Full terminal UI with autocomplete, history, keyboard nav
+**Auto-routing** — Ask anything. The right agent answers.
+**Compare** — Same question, multiple agents, side-by-side.
+**Pipelines** — Chain agents on-the-fly: `gemini:analyze → claude:code` (CLI)
+**Workflows** — Save pipelines as templates, run anywhere (TUI & CLI)
+**Autopilot** — Describe the goal. AI builds the plan.
+**TUI** — Full terminal UI with autocomplete, history, keyboard nav.
 
 ---
 
