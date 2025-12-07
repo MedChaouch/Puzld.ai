@@ -14,13 +14,19 @@ import {
   templateDeleteCommand
 } from './commands/template';
 import { startTUI } from '../tui';
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8'));
 
 const program = new Command();
 
 program
   .name('puzld')
   .description('PuzldAI - Multi-LLM Orchestrator')
-  .version('0.1.0');
+  .version(pkg.version);
 
 program
   .command('run')
