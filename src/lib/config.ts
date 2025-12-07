@@ -21,6 +21,8 @@ export interface PulzdConfig {
 
 const CONFIG_DIR = join(homedir(), '.puzldai');
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
+const OLD_CONFIG_DIR = join(homedir(), '.pulzdai');
+const OLD_CONFIG_PATH = join(OLD_CONFIG_DIR, 'config.json');
 
 const DEFAULT_CONFIG: PulzdConfig = {
   defaultAgent: 'auto',
@@ -48,6 +50,14 @@ export function getConfigPath(): string {
 }
 
 export function loadConfig(): PulzdConfig {
+  // Migrate from old config path if new one doesn't exist
+  if (!existsSync(CONFIG_PATH) && existsSync(OLD_CONFIG_PATH)) {
+    mkdirSync(CONFIG_DIR, { recursive: true });
+    const oldConfig = readFileSync(OLD_CONFIG_PATH, 'utf-8');
+    writeFileSync(CONFIG_PATH, oldConfig);
+    console.log('Migrated config from ~/.pulzdai to ~/.puzldai');
+  }
+
   if (!existsSync(CONFIG_PATH)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
     writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 2));

@@ -4,17 +4,33 @@
  * Load, save, and manage reusable pipeline templates
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync, cpSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { PipelineTemplate, PipelineStep } from './types';
 
 const TEMPLATES_DIR = join(homedir(), '.puzldai', 'templates');
+const OLD_TEMPLATES_DIR = join(homedir(), '.pulzdai', 'templates');
 
 /**
- * Ensure templates directory exists
+ * Ensure templates directory exists and migrate old templates
  */
 export function ensureTemplatesDir(): void {
+  // Migrate old templates if they exist
+  if (!existsSync(TEMPLATES_DIR) && existsSync(OLD_TEMPLATES_DIR)) {
+    mkdirSync(TEMPLATES_DIR, { recursive: true });
+    const oldTemplates = readdirSync(OLD_TEMPLATES_DIR).filter(f => f.endsWith('.json'));
+    for (const file of oldTemplates) {
+      const oldPath = join(OLD_TEMPLATES_DIR, file);
+      const newPath = join(TEMPLATES_DIR, file);
+      const content = readFileSync(oldPath, 'utf-8');
+      writeFileSync(newPath, content);
+    }
+    if (oldTemplates.length > 0) {
+      console.log(`Migrated ${oldTemplates.length} templates from ~/.pulzdai to ~/.puzldai`);
+    }
+  }
+
   if (!existsSync(TEMPLATES_DIR)) {
     mkdirSync(TEMPLATES_DIR, { recursive: true });
   }
