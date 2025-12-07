@@ -71,6 +71,40 @@ puzld check
 
 ---
 
+## Interface
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/interface/tui.png" width="700" alt="PuzldAI TUI">
+</p>
+
+---
+
+## Compare Mode
+
+Run the same prompt on multiple agents and compare results side-by-side.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/1.png" width="700" alt="Compare Mode 1">
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/2.png" width="700" alt="Compare Mode 2">
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/3.png" width="700" alt="Compare Mode 3">
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/4.png" width="700" alt="Compare Mode 4">
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/5.png" width="700" alt="Compare Mode 5">
+</p>
+
+---
+
 ## Features
 
 **Auto-routing** — Task analyzed locally, routed to best agent
