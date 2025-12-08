@@ -6,6 +6,29 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.5] - 2025-12-08
+
+### Added
+- "Messages hidden" hint in compare/collaboration modes (shows count + Esc to return)
+- Single mode output redesigned to match compare/collaboration style:
+  - Teal agent name (`#06ba9e`)
+  - Grey lines (0.8 width)
+  - `[Single]` chip tag
+  - Mode indicator (`auto` or `selected`)
+  - Execution time at footer with green status dot
+
+### Fixed
+- **5 race conditions identified and fixed:**
+  - Stale session capture - now re-fetches session after async operations to prevent cross-agent contamination
+  - Compare result lookup - uses Map for O(1) access instead of array find
+  - Pipeline memory - `Promise.allSettled` preserves partial results (summary OR keyPoints) on failure
+  - Scaffolding - `Promise.allSettled` preserves successful chunk summaries if some fail
+  - Executor (2 places) - `Promise.allSettled` preserves batch results when individual steps fail
+- Autocomplete dropdown now visible in compare/collaboration modes
+- Keyboard handler for autocomplete navigation works in all modes (was disabled in compare/collaboration)
+
+---
+
 ## [0.2.4] - 2025-12-08
 
 ### Added

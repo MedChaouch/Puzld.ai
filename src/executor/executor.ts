@@ -137,11 +137,26 @@ async function executeParallel(
   for (let i = 0; i < steps.length; i += maxConcurrency) {
     const batch = steps.slice(i, i + maxConcurrency);
 
-    const batchResults = await Promise.all(
+    // Use allSettled to preserve results from successful steps even if some fail
+    const batchResults = await Promise.allSettled(
       batch.map((step, batchIdx) => executeStep(step, i + batchIdx, ctx, config, emit, stepStatus))
     );
 
-    results.push(...batchResults);
+    // Extract results, converting rejections to error results
+    for (let j = 0; j < batchResults.length; j++) {
+      const result = batchResults[j];
+      if (result.status === 'fulfilled') {
+        results.push(result.value);
+      } else {
+        // Create error result for failed step
+        const step = batch[j];
+        results.push({
+          stepId: step.id,
+          status: 'failed',
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason)
+        });
+      }
+    }
 
     // Check for abort
     if (config.signal?.aborted) {
@@ -205,7 +220,8 @@ async function executeWithDependencies(
     const maxConcurrency = config.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY;
     const toExecute = ready.slice(0, maxConcurrency);
 
-    const batchResults = await Promise.all(
+    // Use allSettled to preserve results from successful steps even if some fail
+    const batchResults = await Promise.allSettled(
       toExecute.map(async step => {
         const stepIndex = steps.indexOf(step);
         stepStatus.set(step.id, 'running');
@@ -215,10 +231,26 @@ async function executeWithDependencies(
       })
     );
 
-    // Update context with results
-    for (const { step, result } of batchResults) {
-      results.push(result);
-      ctx = addStepResult(ctx, result, step.outputAs);
+    // Update context with results, handling failures gracefully
+    for (let j = 0; j < batchResults.length; j++) {
+      const batchResult = batchResults[j];
+      const step = toExecute[j];
+
+      if (batchResult.status === 'fulfilled') {
+        const { result } = batchResult.value;
+        results.push(result);
+        ctx = addStepResult(ctx, result, step.outputAs);
+      } else {
+        // Create error result for failed step
+        pending.delete(step.id);
+        const errorResult: StepResult = {
+          stepId: step.id,
+          status: 'failed',
+          error: batchResult.reason instanceof Error ? batchResult.reason.message : String(batchResult.reason)
+        };
+        results.push(errorResult);
+        ctx = addStepResult(ctx, errorResult, step.outputAs);
+      }
     }
 
     // Check for abort

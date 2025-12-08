@@ -31,6 +31,7 @@ import { isRouterAvailable } from '../router/router';
 import { adapters } from '../adapters';
 import {
   getLatestSession,
+  loadSession,
   addMessage as addSessionMessage,
   createSession,
   clearSessionHistory,
@@ -282,7 +283,7 @@ function App() {
       // Tab completes when autocomplete available
       handleAutocompleteSelect(autocompleteItems[autocompleteIndex]);
     }
-  }, { isActive: mode !== 'collaboration' && mode !== 'compare' });
+  }, { isActive: mode === 'chat' || autocompleteItems.length > 0 });
 
   // Save current compare results to history and exit compare mode
   const saveCompareToHistory = () => {
@@ -356,11 +357,17 @@ function App() {
     setLoading(true);
     setLoadingText('thinking...');
 
+    // Capture session ID to avoid stale reference after async operations
+    const sessionId = session?.id;
+    const sessionAgent = session?.agent;
+
     // Persist user message to session
-    let currentSession = session;
-    if (currentSession) {
-      currentSession = await addSessionMessage(currentSession, 'user', value);
-      setSession(currentSession);
+    if (sessionId) {
+      const currentSession = loadSession(sessionId);
+      if (currentSession) {
+        const updated = await addSessionMessage(currentSession, 'user', value);
+        setSession(updated);
+      }
     }
 
     try {
@@ -380,10 +387,13 @@ function App() {
           duration: result.duration
         }
       ]);
-      // Persist assistant message to session
-      if (currentSession) {
-        currentSession = await addSessionMessage(currentSession, 'assistant', responseContent);
-        setSession(currentSession);
+      // Persist assistant message to session (re-fetch to avoid stale state)
+      if (sessionId && sessionAgent === currentAgent) {
+        const currentSession = loadSession(sessionId);
+        if (currentSession) {
+          const updated = await addSessionMessage(currentSession, 'assistant', responseContent);
+          setSession(updated);
+        }
       }
     } catch (err) {
       const errorMsg = 'Error: ' + (err as Error).message;
@@ -391,10 +401,13 @@ function App() {
         ...prev,
         { id: nextId(), role: 'assistant', content: errorMsg }
       ]);
-      // Persist error to session
-      if (currentSession) {
-        currentSession = await addSessionMessage(currentSession, 'assistant', errorMsg);
-        setSession(currentSession);
+      // Persist error to session (re-fetch to avoid stale state)
+      if (sessionId && sessionAgent === currentAgent) {
+        const currentSession = loadSession(sessionId);
+        if (currentSession) {
+          const updated = await addSessionMessage(currentSession, 'assistant', errorMsg);
+          setSession(updated);
+        }
       }
     }
 
@@ -631,9 +644,12 @@ Compare View:
 
           const result = await execute(plan);
 
+          // Build result map for safe lookup (O(1) instead of O(n) find)
+          const resultMap = new Map(result.results.map(r => [r.stepId, r]));
+
           // Build visual compare results
           const visualResults: CompareResult[] = agents.map((agent, i) => {
-            const stepResult = result.results.find(r => r.stepId === 'step_' + i);
+            const stepResult = resultMap.get('step_' + i);
             return {
               agent,
               content: stepResult?.content || '',
@@ -1257,9 +1273,25 @@ Compare View:
                           <Text color="#fc8657"> ──</Text>
                         </Text>
                       ) : msg.agent && (
-                        <Text dimColor>── {msg.agent} {msg.duration ? '(' + (msg.duration / 1000).toFixed(1) + 's)' : ''} ──</Text>
+                        <>
+                          <Text>
+                            <Text dimColor>{'─'.repeat(2)} </Text>
+                            <Text bold color="#06ba9e">{msg.agent}</Text>
+                            <Text dimColor> </Text>
+                            <Text color="#666666">[Single]</Text>
+                            <Text dimColor> </Text>
+                            <Text color="#888888">{currentAgent === 'auto' ? 'auto' : 'selected'}</Text>
+                          </Text>
+                          <Text dimColor>{'─'.repeat(Math.floor(((process.stdout.columns || 80) - 2) * 0.8))}</Text>
+                        </>
                       )}
-                      <Text>{msg.content}</Text>
+                      <Text wrap="wrap">{msg.content}</Text>
+                      {msg.agent && msg.agent !== 'autopilot' && (
+                        <Box marginTop={1}>
+                          <Text color="green">●</Text>
+                          <Text dimColor> {msg.duration ? (msg.duration / 1000).toFixed(1) + 's' : '-'}</Text>
+                        </Box>
+                      )}
                     </Box>
                   )}
                 </Box>
@@ -1270,24 +1302,38 @@ Compare View:
 
           {/* Compare View (inline) */}
           {mode === 'compare' && (
-            <CompareView
-              key={compareKey}
-              results={compareResults}
-              onExit={saveCompareToHistory}
-              inputValue={input}
-            />
+            <>
+              {messages.length > 0 && (
+                <Box marginBottom={1}>
+                  <Text dimColor>({messages.length} messages hidden - Esc to return to chat)</Text>
+                </Box>
+              )}
+              <CompareView
+                key={compareKey}
+                results={compareResults}
+                onExit={saveCompareToHistory}
+                inputValue={input}
+              />
+            </>
           )}
 
           {/* Collaboration View (inline) */}
           {mode === 'collaboration' && (
-            <CollaborationView
-              key={collaborationKey}
-              type={collaborationType}
-              steps={collaborationSteps}
-              onExit={saveCollaborationToHistory}
-              inputValue={input}
-              pipelineName={pipelineName}
-            />
+            <>
+              {messages.length > 0 && (
+                <Box marginBottom={1}>
+                  <Text dimColor>({messages.length} messages hidden - Esc to return to chat)</Text>
+                </Box>
+              )}
+              <CollaborationView
+                key={collaborationKey}
+                type={collaborationType}
+                steps={collaborationSteps}
+                onExit={saveCollaborationToHistory}
+                inputValue={input}
+                pipelineName={pipelineName}
+              />
+            </>
           )}
 
           {/* Loading */}
@@ -1310,7 +1356,7 @@ Compare View:
           </Box>
 
           {/* Autocomplete suggestions - aligned with input text (border + padding + "> ") */}
-          {mode === 'chat' && autocompleteItems.length > 0 && !loading && (
+          {(mode === 'chat' || mode === 'compare' || mode === 'collaboration') && autocompleteItems.length > 0 && !loading && (
             <Box flexDirection="column" marginTop={1} marginLeft={4}>
               {autocompleteItems.map((item, i) => {
                 const isSelected = i === autocompleteIndex;

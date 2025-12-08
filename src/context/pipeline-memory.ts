@@ -128,20 +128,19 @@ export async function addStepResultWithMemory(
   }
   // Summarize medium outputs (5k-15k tokens)
   else if (tokens > ctx.config.summarizeThreshold && summarizerAvailable) {
-    try {
-      const [summary, keyPoints] = await Promise.all([
-        summarizeIfNeeded(content, ctx.config.summarizeThreshold),
-        extractKeyPoints(content)
-      ]);
+    // Use allSettled to preserve partial results if one operation fails
+    const [summaryResult, keyPointsResult] = await Promise.allSettled([
+      summarizeIfNeeded(content, ctx.config.summarizeThreshold),
+      extractKeyPoints(content)
+    ]);
 
-      output.summary = summary;
-      output.summaryTokens = estimateTokens(summary);
-      output.keyPoints = keyPoints;
-    } catch {
-      // Fallback: truncate
-      output.summary = truncateForAgent(content, ctx.config.targetAgent);
-      output.summaryTokens = estimateTokens(output.summary);
-    }
+    output.summary = summaryResult.status === 'fulfilled'
+      ? summaryResult.value
+      : truncateForAgent(content, ctx.config.targetAgent);
+    output.summaryTokens = estimateTokens(output.summary);
+    output.keyPoints = keyPointsResult.status === 'fulfilled'
+      ? keyPointsResult.value
+      : [];
   }
 
   // Update context

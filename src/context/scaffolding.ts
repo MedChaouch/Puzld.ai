@@ -202,26 +202,45 @@ export class ContextScaffolder {
     const originalTokens = estimateTokens(content);
     const rawChunks = splitIntoChunks(content, chunkSize, overlap);
 
-    const chunks: ScaffoldChunk[] = await Promise.all(
-      rawChunks.map(async (chunkContent, index) => {
-        const tokens = estimateTokens(chunkContent);
-        const { type, language } = detectChunkType(chunkContent);
+    // Pre-compute non-failing metadata for each chunk
+    const chunkMeta = rawChunks.map((chunkContent, index) => {
+      const tokens = estimateTokens(chunkContent);
+      const { type, language } = detectChunkType(chunkContent);
+      const firstLine = chunkContent.split('\n')[0];
+      const fallbackSummary = firstLine.length > 100 ? firstLine.slice(0, 100) + '...' : firstLine;
+      return { index, chunkContent, tokens, type, language, fallbackSummary };
+    });
 
-        let summary = '';
-        if (tokens > summarizeThreshold) {
-          const result = await summarize(chunkContent, {
-            maxLength: Math.min(200, Math.floor(tokens * 0.2)),
-            preserveCode: type === 'code' || type === 'mixed'
+    // Use allSettled to handle individual chunk summarization failures gracefully
+    const summaryResults = await Promise.allSettled(
+      chunkMeta.map(async (meta) => {
+        if (meta.tokens > summarizeThreshold) {
+          const result = await summarize(meta.chunkContent, {
+            maxLength: Math.min(200, Math.floor(meta.tokens * 0.2)),
+            preserveCode: meta.type === 'code' || meta.type === 'mixed'
           });
-          summary = result.summary;
-        } else {
-          const firstLine = chunkContent.split('\n')[0];
-          summary = firstLine.length > 100 ? firstLine.slice(0, 100) + '...' : firstLine;
+          return result.summary;
         }
-
-        return { index, content: preserveContent ? chunkContent : '', summary, tokens, type, language };
+        return meta.fallbackSummary;
       })
     );
+
+    // Combine metadata with summaries, using fallback for failed summarizations
+    const chunks: ScaffoldChunk[] = chunkMeta.map((meta, i) => {
+      const summaryResult = summaryResults[i];
+      const summary = summaryResult.status === 'fulfilled'
+        ? summaryResult.value
+        : meta.fallbackSummary;
+
+      return {
+        index: meta.index,
+        content: preserveContent ? meta.chunkContent : '',
+        summary,
+        tokens: meta.tokens,
+        type: meta.type,
+        language: meta.language
+      };
+    });
 
     const overallSummary = await this.generateOverallSummary(chunks);
 
