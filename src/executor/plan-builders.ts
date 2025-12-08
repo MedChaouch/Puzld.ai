@@ -305,7 +305,7 @@ Be clear, concise, and well-reasoned.`,
   }
 
   // Subsequent rounds: Agents respond to each other
-  for (let round = 1; round <= rounds; round++) {
+  for (let round = 1; round < rounds; round++) {
     const prevRound = round - 1;
     const prevResponses = agents
       .map(a => `**${a}:** {{${a}_round${prevRound}}}`)
@@ -407,12 +407,12 @@ Provide a clear, actionable proposal.`,
   }
 
   // Voting rounds
-  for (let round = 1; round <= maxRounds; round++) {
+  for (let round = 0; round < maxRounds; round++) {
     const proposals = agents
       .map(a => `**${a}'s proposal:** {{${a}_proposal}}`)
       .join('\n\n');
 
-    const prevVotes = round > 1
+    const prevVotes = round > 0
       ? agents.map(a => `**${a}'s previous vote:** {{${a}_vote${round - 1}}}`).join('\n\n')
       : '';
 
@@ -432,8 +432,8 @@ ${proposals}
 ${prevVotes ? `\n**Previous votes:**\n${prevVotes}` : ''}
 
 Pick the best proposal (can be your own or another's). Explain why. If you see consensus forming, acknowledge it.`,
-        // Round 1 depends on proposals, subsequent rounds depend on previous votes
-        dependsOn: round === 1
+        // Round 0 depends on proposals, subsequent rounds depend on previous votes
+        dependsOn: round === 0
           ? agents.map((_, i) => generateStepId(i))
           : agents.map((_, i) => generateStepId(prevRoundStart + i)),
         outputAs: `${agent}_vote${round}`
@@ -445,7 +445,7 @@ Pick the best proposal (can be your own or another's). Explain why. If you see c
   // Final synthesis
   const synth = synthesizer || agents[0];
   const finalVotes = agents
-    .map(a => `**${a}:** {{${a}_vote${maxRounds}}}`)
+    .map(a => `**${a}:** {{${a}_vote${maxRounds - 1}}}`)
     .join('\n\n');
 
   const lastRoundStart = stepIndex - agents.length;
@@ -454,14 +454,19 @@ Pick the best proposal (can be your own or another's). Explain why. If you see c
     id: generateStepId(stepIndex),
     agent: synth,
     action: 'combine',
-    prompt: `Synthesize the consensus from these votes into a final solution.
+    prompt: `Analyze the votes and synthesize a final solution.
 
 **Task:** {{prompt}}
 
 **Final votes:**
 ${finalVotes}
 
-Create a unified solution that incorporates the agreed-upon elements.`,
+First, identify which proposal won or had the most agreement. Then create a unified solution based on that winning approach, incorporating any valuable additions from other proposals.
+
+Format:
+**Winner:** [agent name]'s proposal
+**Reason:** [why it won/had consensus]
+**Final Solution:** [the synthesized solution]`,
     dependsOn: agents.map((_, i) => generateStepId(lastRoundStart + i)),
     outputAs: 'consensus'
   });

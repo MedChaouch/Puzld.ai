@@ -25,6 +25,7 @@ import { WorkflowsManager } from './components/WorkflowsManager';
 import { SessionsManager } from './components/SessionsManager';
 import { SettingsPanel } from './components/SettingsPanel';
 import { CompareView } from './components/CompareView';
+import { CollaborationView, type CollaborationStep, type CollaborationType } from './components/CollaborationView';
 import { generatePlan } from '../executor/planner';
 import { isRouterAvailable } from '../router/router';
 import { adapters } from '../adapters';
@@ -41,17 +42,19 @@ const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-
 
 interface Message {
   id: string;
-  role: 'user' | 'assistant' | 'compare';
+  role: 'user' | 'assistant' | 'compare' | 'collaboration';
   content: string;
   agent?: string;
   duration?: number;
   compareResults?: CompareResult[];
+  collaborationSteps?: CollaborationStep[];
+  collaborationType?: CollaborationType;
 }
 
 let messageId = 0;
 const nextId = () => String(++messageId);
 
-type AppMode = 'chat' | 'workflows' | 'sessions' | 'settings' | 'compare';
+type AppMode = 'chat' | 'workflows' | 'sessions' | 'settings' | 'compare' | 'collaboration';
 
 interface CompareResult {
   agent: string;
@@ -83,6 +86,9 @@ function App() {
   const [mode, setMode] = useState<AppMode>('chat');
   const [compareResults, setCompareResults] = useState<CompareResult[]>([]);
   const [compareKey, setCompareKey] = useState(0); // Increments to reset CompareView state
+  const [collaborationSteps, setCollaborationSteps] = useState<CollaborationStep[]>([]);
+  const [collaborationType, setCollaborationType] = useState<CollaborationType>('correct');
+  const [collaborationKey, setCollaborationKey] = useState(0); // Increments to reset CollaborationView state
   const [notification, setNotification] = useState<string | null>(null);
   const [agentStatus, setAgentStatus] = useState<AgentStatus[]>([]);
   const [session, setSession] = useState<AgentSession | null>(null);
@@ -262,10 +268,28 @@ function App() {
     }
   };
 
+  // Save current collaboration results to history and exit collaboration mode
+  const saveCollaborationToHistory = () => {
+    if (mode === 'collaboration' && collaborationSteps.length > 0 && !collaborationSteps.some(s => s.loading)) {
+      setMessages(prev => [...prev, {
+        id: nextId(),
+        role: 'collaboration',
+        content: '',
+        collaborationSteps: collaborationSteps,
+        collaborationType: collaborationType
+      }]);
+      setMode('chat');
+      setCollaborationSteps([]);
+    }
+  };
+
   const handleSubmit = async (value: string) => {
-    // Save any active compare to history before processing new input (only if there's actual input)
+    // Save any active compare/collaboration to history before processing new input (only if there's actual input)
     if (mode === 'compare' && value.trim()) {
       saveCompareToHistory();
+    }
+    if (mode === 'collaboration' && value.trim()) {
+      saveCollaborationToHistory();
     }
 
     // If autocomplete is showing with single match, execute that command
@@ -651,9 +675,22 @@ Compare View:
         const reviewer = correctMatch[2];
         const task = correctMatch[3] || correctMatch[4];
 
+        // Add user message to chat history
         setMessages(prev => [...prev, { id: nextId(), role: 'user', content: '/correct ' + producer + ' ' + reviewer + ' "' + task + '"' }]);
-        setLoading(true);
-        setLoadingText(correctFix ? 'correcting with fix...' : 'running correction...');
+
+        // Initialize collaboration steps with loading state
+        const initialSteps: CollaborationStep[] = [
+          { agent: producer, role: 'producer', content: '', loading: true },
+          { agent: reviewer, role: 'reviewer', content: '', loading: true },
+        ];
+        if (correctFix) {
+          initialSteps.push({ agent: producer, role: 'fix', content: '', loading: true });
+        }
+
+        setCollaborationKey(k => k + 1);
+        setCollaborationSteps(initialSteps);
+        setCollaborationType('correct');
+        setMode('collaboration');
 
         try {
           const plan = buildCorrectionPlan(task, {
@@ -664,20 +701,47 @@ Compare View:
 
           const result = await execute(plan);
 
-          let output = '─── Cross-Agent Correction ───\n\n';
-          output += '**Producer (' + producer + '):**\n';
-          output += (result.results[0]?.content || 'Failed') + '\n\n';
-          output += '**Review (' + reviewer + '):**\n';
-          output += (result.results[1]?.content || 'Failed');
+          // Build visual collaboration steps
+          const steps: CollaborationStep[] = [
+            {
+              agent: producer,
+              role: 'producer',
+              content: result.results[0]?.content || '',
+              error: result.results[0]?.error,
+              duration: result.results[0]?.duration,
+              loading: false
+            },
+            {
+              agent: reviewer,
+              role: 'reviewer',
+              content: result.results[1]?.content || '',
+              error: result.results[1]?.error,
+              duration: result.results[1]?.duration,
+              loading: false
+            }
+          ];
 
           if (correctFix && result.results[2]) {
-            output += '\n\n**Fixed (' + producer + '):**\n';
-            output += result.results[2].content || 'Failed';
+            steps.push({
+              agent: producer,
+              role: 'fix',
+              content: result.results[2]?.content || '',
+              error: result.results[2]?.error,
+              duration: result.results[2]?.duration,
+              loading: false
+            });
           }
 
-          addMessage(output, 'correction');
+          setCollaborationSteps(steps);
         } catch (err) {
-          addMessage('Error: ' + (err as Error).message);
+          // Show error in collaboration view
+          const errorSteps = initialSteps.map(s => ({
+            ...s,
+            content: '',
+            error: (err as Error).message,
+            loading: false
+          }));
+          setCollaborationSteps(errorSteps);
         }
 
         setLoading(false);
@@ -702,9 +766,36 @@ Compare View:
 
         const moderator = debateModerator !== 'none' ? debateModerator as AgentName : undefined;
 
+        // Add user message to chat history
         setMessages(prev => [...prev, { id: nextId(), role: 'user', content: '/debate ' + agentsStr + ' "' + topic + '"' }]);
-        setLoading(true);
-        setLoadingText('debating (' + debateRounds + ' rounds)...');
+
+        // Initialize collaboration steps with loading state
+        // Each round has all agents, plus optional moderator at end
+        const initialDebateSteps: CollaborationStep[] = [];
+        for (let round = 0; round < debateRounds; round++) {
+          for (const agent of agents) {
+            initialDebateSteps.push({
+              agent,
+              role: `round-${round}`,
+              round,
+              content: '',
+              loading: true
+            });
+          }
+        }
+        if (moderator) {
+          initialDebateSteps.push({
+            agent: moderator,
+            role: 'moderator',
+            content: '',
+            loading: true
+          });
+        }
+
+        setCollaborationKey(k => k + 1);
+        setCollaborationSteps(initialDebateSteps);
+        setCollaborationType('debate');
+        setMode('collaboration');
 
         try {
           const plan = buildDebatePlan(topic, {
@@ -715,28 +806,48 @@ Compare View:
 
           const result = await execute(plan);
 
-          let output = '─── Multi-Agent Debate ───\n';
-          for (let round = 0; round <= debateRounds; round++) {
-            output += '\n**Round ' + round + '**\n';
+          // Build visual collaboration steps
+          const debateSteps: CollaborationStep[] = [];
+          for (let round = 0; round < debateRounds; round++) {
             for (let i = 0; i < agents.length; i++) {
               const stepIndex = round * agents.length + i;
               const stepResult = result.results[stepIndex];
-              output += '\n[' + agents[i] + ']:\n' + (stepResult?.content || '(no response)') + '\n';
+              debateSteps.push({
+                agent: agents[i],
+                role: `round-${round}`,
+                round,
+                content: stepResult?.content || '',
+                error: stepResult?.error,
+                duration: stepResult?.duration,
+                loading: false
+              });
             }
           }
 
           if (moderator) {
             const conclusionStep = result.results[result.results.length - 1];
-            output += '\n**Conclusion (' + moderator + '):**\n';
-            output += conclusionStep?.content || '(no conclusion)';
+            debateSteps.push({
+              agent: moderator,
+              role: 'moderator',
+              content: conclusionStep?.content || '',
+              error: conclusionStep?.error,
+              duration: conclusionStep?.duration,
+              loading: false
+            });
           }
 
-          addMessage(output, 'debate');
+          setCollaborationSteps(debateSteps);
         } catch (err) {
-          addMessage('Error: ' + (err as Error).message);
+          // Show error in collaboration view
+          const errorSteps = initialDebateSteps.map(s => ({
+            ...s,
+            content: '',
+            error: (err as Error).message,
+            loading: false
+          }));
+          setCollaborationSteps(errorSteps);
         }
 
-        setLoading(false);
         break;
       }
 
@@ -758,9 +869,48 @@ Compare View:
 
         const synth = consensusSynthesizer !== 'auto' ? consensusSynthesizer as AgentName : undefined;
 
+        // Add user message to chat history
         setMessages(prev => [...prev, { id: nextId(), role: 'user', content: '/consensus ' + agentsStr + ' "' + task + '"' }]);
-        setLoading(true);
-        setLoadingText('building consensus (' + consensusRounds + ' rounds)...');
+
+        // Initialize collaboration steps with loading state
+        // Proposals (one per agent) + voting rounds + synthesis
+        const initialConsensusSteps: CollaborationStep[] = [];
+
+        // Initial proposals
+        for (const agent of agents) {
+          initialConsensusSteps.push({
+            agent,
+            role: 'proposal',
+            content: '',
+            loading: true
+          });
+        }
+
+        // Voting rounds
+        for (let round = 0; round < consensusRounds; round++) {
+          for (const agent of agents) {
+            initialConsensusSteps.push({
+              agent,
+              role: 'vote',
+              round,
+              content: '',
+              loading: true
+            });
+          }
+        }
+
+        // Final synthesis
+        initialConsensusSteps.push({
+          agent: synth || agents[0],
+          role: 'synthesis',
+          content: '',
+          loading: true
+        });
+
+        setCollaborationKey(k => k + 1);
+        setCollaborationSteps(initialConsensusSteps);
+        setCollaborationType('consensus');
+        setMode('collaboration');
 
         try {
           const plan = buildConsensusPlan(task, {
@@ -771,17 +921,62 @@ Compare View:
 
           const result = await execute(plan);
 
-          // Show final consensus
-          const finalResult = result.results[result.results.length - 1];
-          let output = '─── Consensus Result ───\n\n';
-          output += finalResult?.content || '(no consensus reached)';
+          // Build visual collaboration steps from results
+          const consensusSteps: CollaborationStep[] = [];
+          let resultIndex = 0;
 
-          addMessage(output, 'consensus');
+          // Proposals
+          for (const agent of agents) {
+            const stepResult = result.results[resultIndex++];
+            consensusSteps.push({
+              agent,
+              role: 'proposal',
+              content: stepResult?.content || '',
+              error: stepResult?.error,
+              duration: stepResult?.duration,
+              loading: false
+            });
+          }
+
+          // Voting rounds
+          for (let round = 0; round < consensusRounds; round++) {
+            for (const agent of agents) {
+              const stepResult = result.results[resultIndex++];
+              consensusSteps.push({
+                agent,
+                role: 'vote',
+                round,
+                content: stepResult?.content || '',
+                error: stepResult?.error,
+                duration: stepResult?.duration,
+                loading: false
+              });
+            }
+          }
+
+          // Final synthesis
+          const synthResult = result.results[resultIndex];
+          consensusSteps.push({
+            agent: synth || agents[0],
+            role: 'synthesis',
+            content: synthResult?.content || '',
+            error: synthResult?.error,
+            duration: synthResult?.duration,
+            loading: false
+          });
+
+          setCollaborationSteps(consensusSteps);
         } catch (err) {
-          addMessage('Error: ' + (err as Error).message);
+          // Show error in collaboration view
+          const errorSteps = initialConsensusSteps.map(s => ({
+            ...s,
+            content: '',
+            error: (err as Error).message,
+            loading: false
+          }));
+          setCollaborationSteps(errorSteps);
         }
 
-        setLoading(false);
         break;
       }
 
@@ -856,8 +1051,8 @@ Compare View:
         />
       )}
 
-      {/* Chat Mode (also shows compare results inline) */}
-      {(mode === 'chat' || mode === 'compare') && (
+      {/* Chat Mode (also shows compare/collaboration results inline) */}
+      {(mode === 'chat' || mode === 'compare' || mode === 'collaboration') && (
         <>
           {/* Messages */}
           <Box flexDirection="column" marginBottom={1} width="100%">
@@ -889,6 +1084,15 @@ Compare View:
                     );
                   })}
                 </Box>
+              ) : msg.role === 'collaboration' && msg.collaborationSteps ? (
+                // Static render for historical collaboration results
+                <CollaborationView
+                  key={msg.id}
+                  type={msg.collaborationType || 'correct'}
+                  steps={msg.collaborationSteps}
+                  onExit={() => {}}
+                  interactive={false}
+                />
               ) : (
                 <Box key={msg.id} marginBottom={1}>
                   {msg.role === 'user' ? (
@@ -915,6 +1119,17 @@ Compare View:
               key={compareKey}
               results={compareResults}
               onExit={saveCompareToHistory}
+              inputValue={input}
+            />
+          )}
+
+          {/* Collaboration View (inline) */}
+          {mode === 'collaboration' && (
+            <CollaborationView
+              key={collaborationKey}
+              type={collaborationType}
+              steps={collaborationSteps}
+              onExit={saveCollaborationToHistory}
               inputValue={input}
             />
           )}

@@ -158,8 +158,8 @@ function displayDebateResults(
   rounds: number,
   hasModerator: boolean
 ): void {
-  for (let round = 0; round <= rounds; round++) {
-    console.log(pc.bold(`--- Round ${round} ---\n`));
+  for (let round = 0; round < rounds; round++) {
+    console.log(pc.bold(`--- Round ${round + 1} ---\n`));
 
     for (let i = 0; i < agents.length; i++) {
       const agent = agents[i];

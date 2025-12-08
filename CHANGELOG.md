@@ -6,6 +6,22 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.1] - 2025-12-08
+
+### Added
+- CollaborationView component with 3 view modes (side-by-side, expanded, all)
+- Debate mode displays 2 boxes per row with up/down arrow navigation
+- Consensus mode displays 3 boxes per row with grid navigation
+- Mode labels highlighted in yellow (e.g., "[Correct Mode]", "[Debate Mode]")
+
+### Fixed
+- Round counting: setting 2 rounds now correctly shows 2 total (was showing 3)
+- Rounds display as 1-based (Round 1, Round 2) instead of 0-based
+- Role labels (Producer, Reviewer, etc.) now use teal color matching agent names
+- Consensus synthesis prompt now identifies winning proposal before merging
+
+---
+
 ## [0.2.0] - 2025-12-07
 
 ### Added - Phase 1-4 Complete
