@@ -37,41 +37,6 @@
 
 ---
 
-## Install
-
-```bash
-npm install -g puzldai
-```
-
-Or try without installing:
-
-```bash
-npx puzldai
-```
-
----
-
-## Quick Start
-
-```bash
-# Interactive TUI
-puzld
-
-# Single task
-puzld run "explain recursion"
-
-# Compare agents
-puzld compare claude,gemini "best error handling practices"
-
-# Pipeline: analyze → code → review
-puzld run "build a logger" -P "gemini:analyze,claude:code,gemini:review"
-
-# Check what's available
-puzld check
-```
-
----
-
 ## Features
 
 - **Auto-routing** — Ask anything. The right agent answers.
@@ -96,11 +61,92 @@ puzld check
 
 ---
 
+## Install
+
+```bash
+npm install -g puzldai
+```
+
+Or try without installing:
+
+```bash
+npx puzldai
+```
+
+---
+
+## Quick Start
+
+```bash
+# Interactive TUI
+puzldai
+
+# Single task
+puzldai run "explain recursion"
+
+# Compare agents
+puzldai compare claude,gemini "best error handling practices"
+
+# Pipeline: analyze → code → review
+puzldai run "build a logger" -P "gemini:analyze,claude:code,gemini:review"
+
+# Multi-agent collaboration
+puzldai correct "write a sort function" --producer claude --reviewer gemini
+puzldai debate "microservices vs monolith" -a claude,gemini
+puzldai consensus "best database choice" -a claude,gemini,ollama
+
+# Check what's available
+puzldai check
+```
+
+> `puzld` also works as a shorter alias.
+
+---
+
 ## Interface
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/interface/tui.png" width="700" alt="PuzldAI TUI">
 </p>
+
+---
+
+## Execution Modes
+
+| Mode | Pattern | Use Case | Category |
+|------|---------|----------|----------|
+| **Single** | One agent processes task | Quick questions, simple tasks | Basic |
+| **Compare** | Same task → multiple agents in parallel | See different perspectives | Parallel |
+| **Pipeline** | Agent A → Agent B → Agent C | Multi-step processing | Sequencing |
+| **Template** | Saved pipeline, reusable | Repeatable workflows | Sequencing |
+| **Autopilot** | LLM generates plan → executes | Complex tasks, unknown steps | AI Planning |
+| **Correct** | Producer → Reviewer → Fix | Quality assurance, code review | Collaboration |
+| **Debate** | Agents argue in rounds, optional moderator | Find flaws in reasoning | Collaboration |
+| **Consensus** | Propose → Vote → Synthesize | High-confidence answers | Collaboration |
+
+### Mode Options
+
+| Mode | Option | Type | Default | Description |
+|------|--------|------|---------|-------------|
+| Single | `agent` | AgentName | `auto` | Which agent to use |
+| Compare | `agents` | AgentName[] | — | Agents to compare (min 2) |
+| | `sequential` | boolean | `false` | Run one-at-a-time vs parallel |
+| | `pick` | boolean | `false` | LLM selects best response |
+| Pipeline | `steps` | PipelineStep[] | — | Sequence of agent:action |
+| | `interactive` | boolean | `false` | Confirm between steps |
+| Template | `name` | string | — | Template to load |
+| | `interactive` | boolean | `false` | Confirm between steps |
+| Autopilot | `planner` | AgentName | `ollama` | Agent that generates plan |
+| | `execute` | boolean | `false` | Auto-run generated plan |
+| Correct | `producer` | AgentName | `auto` | Agent that creates output |
+| | `reviewer` | AgentName | `auto` | Agent that critiques |
+| | `fixAfterReview` | boolean | `false` | Producer fixes based on review |
+| Debate | `agents` | AgentName[] | — | Debating agents (min 2) |
+| | `rounds` | number | `2` | Number of debate rounds |
+| | `moderator` | AgentName | `none` | Synthesizes final conclusion |
+| Consensus | `agents` | AgentName[] | — | Participating agents (min 2) |
+| | `maxRounds` | number | `2` | Voting rounds |
+| | `synthesizer` | AgentName | `auto` | Creates final output |
 
 ---
 
@@ -117,10 +163,10 @@ Three views: **side-by-side**, **expanded**, or **stacked**.
 /pick                          # Toggle: select best response
 
 # CLI
-puzld compare "task"                          # Default: claude,gemini
-puzld compare "task" -a claude,gemini,codex   # Specify agents
-puzld compare "task" -s                       # Sequential mode
-puzld compare "task" -p                       # Pick best response
+puzldai compare "task"                          # Default: claude,gemini
+puzldai compare "task" -a claude,gemini,codex   # Specify agents
+puzldai compare "task" -s                       # Sequential mode
+puzldai compare "task" -p                       # Pick best response
 ```
 
 <p align="center">
@@ -150,8 +196,8 @@ puzld compare "task" -p                       # Pick best response
 Chain multiple agents together for complex tasks. Each agent handles a specific step.
 
 ```bash
-puzld run "build a REST API" -P "gemini:analyze,claude:code,gemini:review"
-puzld run "task" -P "claude:plan,codex:code" -i   # Interactive: pause between steps
+puzldai run "build a REST API" -P "gemini:analyze,claude:code,gemini:review"
+puzldai run "task" -P "claude:plan,codex:code" -i   # Interactive: pause between steps
 ```
 
 <p align="center">
@@ -173,12 +219,12 @@ Three views: **side-by-side**, **expanded**, or **stacked**.
 /interactive                   # Toggle: pause between steps
 
 # CLI
-puzld run "task" -T code-review
-puzld run "task" -T code-review -i   # Interactive mode
-puzld template list            # List all templates
-puzld template show my-flow    # Show template details
-puzld template create my-flow -P "claude:plan,codex:code"
-puzld template delete my-flow  # Delete template
+puzldai run "task" -T code-review
+puzldai run "task" -T code-review -i   # Interactive mode
+puzldai template list            # List all templates
+puzldai template show my-flow    # Show template details
+puzldai template create my-flow -P "claude:plan,codex:code"
+puzldai template delete my-flow  # Delete template
 ```
 
 <p align="center">
@@ -208,9 +254,9 @@ With `/execute` enabled, results display in **3 view modes**: side-by-side, expa
 /execute                       # Toggle auto-execution on/off
 
 # CLI
-puzld plan "task"              # Generate plan only
-puzld plan "task" -x           # Generate and execute
-puzld plan "task" -p claude    # Use specific agent as planner
+puzldai autopilot "task"              # Generate plan only
+puzldai autopilot "task" -x           # Generate and execute
+puzldai autopilot "task" -p claude    # Use specific agent as planner
 ```
 
 <p align="center">
@@ -240,8 +286,8 @@ One agent produces, another reviews. Optionally fix based on feedback.
 /correct claude gemini "write a sorting algorithm"
 
 # CLI
-puzld correct "task" --producer claude --reviewer gemini
-puzld correct "task" --producer claude --reviewer gemini --fix
+puzldai correct "task" --producer claude --reviewer gemini
+puzldai correct "task" --producer claude --reviewer gemini --fix
 ```
 
 ### Debate Mode
@@ -253,8 +299,8 @@ Agents debate a topic across multiple rounds. Optional moderator summarizes.
 /debate claude,gemini "Is functional programming better than OOP?"
 
 # CLI
-puzld debate "topic" -a claude,gemini
-puzld debate "topic" -a claude,gemini -r 3 -m ollama   # 3 rounds + moderator
+puzldai debate "topic" -a claude,gemini
+puzldai debate "topic" -a claude,gemini -r 3 -m ollama   # 3 rounds + moderator
 ```
 
 ### Consensus Mode
@@ -266,8 +312,8 @@ Agents propose solutions, vote on them, and synthesize a final answer.
 /consensus claude,gemini,ollama "best database for this use case"
 
 # CLI
-puzld consensus "task" -a claude,gemini,ollama
-puzld consensus "task" -a claude,gemini -r 3 -s claude   # 3 rounds + synthesizer
+puzldai consensus "task" -a claude,gemini,ollama
+puzldai consensus "task" -a claude,gemini -r 3 -s claude   # 3 rounds + synthesizer
 ```
 
 All collaboration modes support **3 view modes**: side-by-side, expanded, and stacked.
@@ -308,36 +354,36 @@ Configure rounds, moderator, and synthesizer in `/settings`.
 ### CLI Mode
 
 ```bash
-puzld                           # Launch TUI
-puzld run "task"                # Single task
-puzld run "task" -a claude      # Force agent
-puzld run "task" -P "..."       # Pipeline
-puzld run "task" -T template    # Use template
-puzld run "task" -i             # Interactive: pause between steps
-puzld compare "task"            # Compare (default: claude,gemini)
-puzld compare "task" -a a,b,c   # Specify agents
-puzld compare "task" -s         # Sequential mode
-puzld compare "task" -p         # Pick best response
-puzld autopilot "task"          # Generate plan
-puzld autopilot "task" -x       # Plan + execute
-puzld autopilot "task" -p claude # Use specific planner
-puzld correct "task" --producer claude --reviewer gemini
-puzld correct "task" --producer claude --reviewer gemini --fix
-puzld debate "topic" -a claude,gemini -r 3 -m ollama
-puzld consensus "task" -a claude,gemini -r 3 -s claude
-puzld session list              # List sessions
-puzld session new               # Create new session
-puzld check                     # Agent status
-puzld agent                     # Interactive agent mode
-puzld agent -a claude           # Force specific agent
-puzld serve                     # API server
-puzld serve -p 8080             # Custom port
-puzld serve -w                  # With web terminal
-puzld template list             # List templates
-puzld template show <name>      # Show template details
-puzld template create <name> -P "..." -d "desc"
-puzld template edit <name>      # Edit template
-puzld template delete <name>    # Delete template
+puzldai                           # Launch TUI
+puzldai run "task"                # Single task
+puzldai run "task" -a claude      # Force agent
+puzldai run "task" -P "..."       # Pipeline
+puzldai run "task" -T template    # Use template
+puzldai run "task" -i             # Interactive: pause between steps
+puzldai compare "task"            # Compare (default: claude,gemini)
+puzldai compare "task" -a a,b,c   # Specify agents
+puzldai compare "task" -s         # Sequential mode
+puzldai compare "task" -p         # Pick best response
+puzldai autopilot "task"          # Generate plan
+puzldai autopilot "task" -x       # Plan + execute
+puzldai autopilot "task" -p claude # Use specific planner
+puzldai correct "task" --producer claude --reviewer gemini
+puzldai correct "task" --producer claude --reviewer gemini --fix
+puzldai debate "topic" -a claude,gemini -r 3 -m ollama
+puzldai consensus "task" -a claude,gemini -r 3 -s claude
+puzldai session list              # List sessions
+puzldai session new               # Create new session
+puzldai check                     # Agent status
+puzldai agent                     # Interactive agent mode
+puzldai agent -a claude           # Force specific agent
+puzldai serve                     # API server
+puzldai serve -p 8080             # Custom port
+puzldai serve -w                  # With web terminal
+puzldai template list             # List templates
+puzldai template show <name>      # Show template details
+puzldai template create <name> -P "..." -d "desc"
+puzldai template edit <name>      # Edit template
+puzldai template delete <name>    # Delete template
 ```
 
 ---
@@ -391,7 +437,7 @@ cd Puzld.ai
 bun install
 bun run build
 npm link
-puzld
+puzldai
 ```
 
 ---
