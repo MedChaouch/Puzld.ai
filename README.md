@@ -172,23 +172,11 @@ puzldai compare "task" -p                       # Pick best response
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/1.png" width="700" alt="Compare Mode 1">
+  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/compare-mode-1.gif" width="700" alt="Compare Mode 1">
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/2.png" width="700" alt="Compare Mode 2">
-</p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/3.png" width="700" alt="Compare Mode 3">
-</p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/4.png" width="700" alt="Compare Mode 4">
-</p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/5.png" width="700" alt="Compare Mode 5">
+  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/compare-mode/compare-mode-2.gif" width="700" alt="Compare Mode 2">
 </p>
 
 ---
