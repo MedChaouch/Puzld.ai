@@ -272,6 +272,10 @@ puzldai correct "task" --producer claude --reviewer gemini
 puzldai correct "task" --producer claude --reviewer gemini --fix
 ```
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/correct-mode/correct-mode.gif" width="700" alt="Correct Mode">
+</p>
+
 ### Debate Mode
 
 Agents debate a topic across multiple rounds. Optional moderator summarizes.
