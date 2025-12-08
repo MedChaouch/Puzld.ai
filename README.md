@@ -128,25 +128,25 @@ puzldai check
 
 | Mode | Option | Type | Default | Description |
 |------|--------|------|---------|-------------|
-| Single | `agent` | AgentName | `auto` | Which agent to use |
-| Compare | `agents` | AgentName[] | — | Agents to compare (min 2) |
-| | `sequential` | boolean | `false` | Run one-at-a-time vs parallel |
-| | `pick` | boolean | `false` | LLM selects best response |
-| Pipeline | `steps` | PipelineStep[] | — | Sequence of agent:action |
-| | `interactive` | boolean | `false` | Confirm between steps |
-| Template | `name` | string | — | Template to load |
-| | `interactive` | boolean | `false` | Confirm between steps |
-| Autopilot | `planner` | AgentName | `ollama` | Agent that generates plan |
-| | `execute` | boolean | `false` | Auto-run generated plan |
-| Correct | `producer` | AgentName | `auto` | Agent that creates output |
-| | `reviewer` | AgentName | `auto` | Agent that critiques |
-| | `fixAfterReview` | boolean | `false` | Producer fixes based on review |
-| Debate | `agents` | AgentName[] | — | Debating agents (min 2) |
-| | `rounds` | number | `2` | Number of debate rounds |
-| | `moderator` | AgentName | `none` | Synthesizes final conclusion |
-| Consensus | `agents` | AgentName[] | — | Participating agents (min 2) |
-| | `maxRounds` | number | `2` | Voting rounds |
-| | `synthesizer` | AgentName | `auto` | Creates final output |
+| Single | <code style="color:#e06c75">agent</code> | AgentName | `auto` | Which agent to use |
+| Compare | <code style="color:#e06c75">agents</code> | AgentName[] | — | Agents to compare (min 2) |
+| | <code style="color:#e06c75">sequential</code> | boolean | `false` | Run one-at-a-time vs parallel |
+| | <code style="color:#e06c75">pick</code> | boolean | `false` | LLM selects best response |
+| Pipeline | <code style="color:#e06c75">steps</code> | PipelineStep[] | — | Sequence of agent:action |
+| | <code style="color:#e06c75">interactive</code> | boolean | `false` | Confirm between steps |
+| Template | <code style="color:#e06c75">name</code> | string | — | Template to load |
+| | <code style="color:#e06c75">interactive</code> | boolean | `false` | Confirm between steps |
+| Autopilot | <code style="color:#e06c75">planner</code> | AgentName | `ollama` | Agent that generates plan |
+| | <code style="color:#e06c75">execute</code> | boolean | `false` | Auto-run generated plan |
+| Correct | <code style="color:#e06c75">producer</code> | AgentName | `auto` | Agent that creates output |
+| | <code style="color:#e06c75">reviewer</code> | AgentName | `auto` | Agent that critiques |
+| | <code style="color:#e06c75">fixAfterReview</code> | boolean | `false` | Producer fixes based on review |
+| Debate | <code style="color:#e06c75">agents</code> | AgentName[] | — | Debating agents (min 2) |
+| | <code style="color:#e06c75">rounds</code> | number | `2` | Number of debate rounds |
+| | <code style="color:#e06c75">moderator</code> | AgentName | `none` | Synthesizes final conclusion |
+| Consensus | <code style="color:#e06c75">agents</code> | AgentName[] | — | Participating agents (min 2) |
+| | <code style="color:#e06c75">maxRounds</code> | number | `2` | Voting rounds |
+| | <code style="color:#e06c75">synthesizer</code> | AgentName | `auto` | Creates final output |
 
 ---
 
