@@ -6,6 +6,14 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.51] - 2025-12-08
+
+### Changed
+- Fresh session on startup instead of loading latest (use `/resume` to continue previous)
+- First-launch hint shows "Use /resume to continue a previous session" (auto-dismisses after 4s)
+
+---
+
 ## [0.2.5] - 2025-12-08
 
 ### Added

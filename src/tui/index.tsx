@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { render, Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { readFileSync } from 'fs';
@@ -164,11 +164,23 @@ function App() {
     setMode('chat');
   };
 
-  // Load session for current agent
+  // Track if we've shown the resume hint (ref to avoid re-renders)
+  const hasShownHint = useRef(false);
+
+  // Start fresh session for current agent (use /resume to continue previous)
   useEffect(() => {
-    const sess = getLatestSession(currentAgent);
+    const sess = createSession(currentAgent);
     setSession(sess);
-    restoreFromSession(sess);
+    setMessages([]);
+    messageId = 0;
+
+    // Show hint about resuming sessions on first launch only
+    if (!hasShownHint.current) {
+      setNotification('Use /resume to continue a previous session');
+      const timer = setTimeout(() => setNotification(null), 4000);
+      hasShownHint.current = true;
+      return () => clearTimeout(timer);
+    }
   }, [currentAgent]);
 
   // Handle workflow run from WorkflowsManager
