@@ -115,28 +115,6 @@ puzldai check
 
 ---
 
-## Model Selection
-
-Pick specific models for each agent. Aliases like `sonnet`, `opus`, `haiku` always point to the latest version. Specific versions like `claude-sonnet-4-20250514` are pinned.
-
-```bash
-# TUI
-/model                            # Open model selection panel
-
-# CLI
-puzldai model show                # Show current models for all agents
-puzldai model list                # List all available models
-puzldai model list claude         # List models for specific agent
-puzldai model set claude opus     # Set model for an agent
-puzldai model clear claude        # Reset to CLI default
-
-# Per-task override
-puzldai run "task" -m opus        # Override model for this run
-puzldai agent -a claude -m haiku  # Interactive mode with specific model
-```
-
----
-
 ## Execution Modes
 
 | Mode | Pattern | Use Case | Category |
@@ -174,6 +152,34 @@ puzldai agent -a claude -m haiku  # Interactive mode with specific model
 | Consensus | `agents` | AgentName[] | — | Participating agents (min 2) |
 | | `maxRounds` | number | `2` | Voting rounds |
 | | `synthesizer` | AgentName | `auto` | Creates final output |
+
+### Model Selection
+
+Pick specific models for each agent. Aliases like `sonnet`, `opus`, `haiku` always point to the latest version. Specific versions like `claude-sonnet-4-20250514` are pinned.
+
+```bash
+# TUI
+/model                            # Open model selection panel
+
+# CLI
+puzldai model show                # Show current models for all agents
+puzldai model list                # List all available models
+puzldai model list claude         # List models for specific agent
+puzldai model set claude opus     # Set model for an agent
+puzldai model clear claude        # Reset to CLI default
+
+# Per-task override
+puzldai run "task" -m opus        # Override model for this run
+puzldai agent -a claude -m haiku  # Interactive mode with specific model
+```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/Models/Model-change.gif" width="700" alt="Model Selection">
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MedChaouch/Puzld.ai/main/assets/Models/model-change.png" width="700" alt="Model Change">
+</p>
 
 ---
 
