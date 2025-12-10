@@ -16,8 +16,8 @@
 <p align="center">
   <img src="https://img.shields.io/npm/v/puzldai?color=blue" alt="npm">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-green" alt="license">
-  <img src="https://img.shields.io/badge/agents-Claude%20Code%20%7C%20Gemini%20CLI%20%7C%20Codex%20CLI%20%7C%20Ollama-purple" alt="agents">
-  <img src="https://img.shields.io/badge/models-sonnet%20%7C%20opus%20%7C%20haiku%20%7C%20gemini--pro%20%7C%20gpt--codex-orange" alt="models">
+  <img src="https://img.shields.io/badge/agents-Claude%20%7C%20Gemini%20%7C%20Codex%20%7C%20Ollama%20%7C%20Mistral-purple" alt="agents">
+  <img src="https://img.shields.io/badge/models-sonnet%20%7C%20opus%20%7C%20gemini--pro%20%7C%20devstral-orange" alt="models">
 </p>
 
 ---
@@ -63,6 +63,7 @@ PuzldAI is a fast, terminal-native framework for orchestrating multiple AI agent
 | Gemini | Google | [Gemini CLI](https://ai.google.dev) |
 | Codex | OpenAI | [Codex CLI](https://openai.com) |
 | Ollama | Local | [Ollama](https://ollama.ai) running |
+| Mistral | Mistral AI | [Vibe CLI](https://github.com/mistralai/vibe) |
 
 ---
 
@@ -440,7 +441,8 @@ puzldai template delete <name>    # Delete template
     "claude": { "enabled": true, "path": "claude", "model": "sonnet" },
     "gemini": { "enabled": true, "path": "gemini", "model": "gemini-2.5-pro" },
     "codex": { "enabled": false, "path": "codex", "model": "gpt-5.1-codex" },
-    "ollama": { "enabled": true, "model": "llama3.2" }
+    "ollama": { "enabled": true, "model": "llama3.2" },
+    "mistral": { "enabled": true, "path": "vibe" }
   }
 }
 ```
@@ -463,6 +465,7 @@ User Input
                │ (Ollama)  │      │ Gemini      │
                └───────────┘      │ Codex       │
                                   │ Ollama      │
+                                  │ Mistral     │
                                   └─────────────┘
 ```
 
