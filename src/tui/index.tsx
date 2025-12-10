@@ -41,9 +41,8 @@ import {
   clearSessionHistory,
   type AgentSession
 } from '../memory';
-import { checkForUpdate } from '../lib/updateCheck';
+import { checkForUpdate, markUpdated } from '../lib/updateCheck';
 import { UpdatePrompt } from './components/UpdatePrompt';
-import { StepConfirmation, type ConfirmAction } from './components/StepConfirmation';
 import { AgentPanel } from './components/AgentPanel';
 import { execa } from 'execa';
 import type { PlanStep, StepResult } from '../executor';
@@ -109,15 +108,6 @@ function App() {
   const [updateInfo, setUpdateInfo] = useState<{ current: string; latest: string } | null>(null);
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-
-  // Interactive step confirmation state
-  const [stepConfirmation, setStepConfirmation] = useState<{
-    step: PlanStep;
-    stepNumber: number;
-    totalSteps: number;
-    resolve: (result: { proceed: boolean; editedPrompt?: string }) => void;
-  } | null>(null);
-  const [yesAllMode, setYesAllMode] = useState(false);
 
   // Value options
   const [currentAgent, setCurrentAgent] = useState('auto');
@@ -214,6 +204,10 @@ function App() {
     setNotification('Updating PuzldAI...');
     try {
       await execa('npm', ['update', '-g', 'puzldai']);
+      // Mark this version as updated so we don't prompt again on restart
+      if (updateInfo) {
+        markUpdated(updateInfo.latest);
+      }
       setNotification('Updated! Restart puzldai to use the new version.');
     } catch {
       setNotification('Update failed. Run: npm update -g puzldai');
@@ -224,55 +218,6 @@ function App() {
   // Handle skip update
   const handleSkipUpdate = () => {
     setShowUpdatePrompt(false);
-  };
-
-  // Abort controller for interactive mode
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Create onBeforeStep handler for interactive mode
-  const createOnBeforeStep = (totalSteps: number) => {
-    return async (step: PlanStep, index: number): Promise<{ proceed: boolean; editedPrompt?: string }> => {
-      // If yes all mode, skip confirmation
-      if (yesAllMode) {
-        return { proceed: true };
-      }
-
-      // Show confirmation dialog and wait for response
-      return new Promise((resolve) => {
-        setStepConfirmation({
-          step,
-          stepNumber: index + 1,
-          totalSteps,
-          resolve
-        });
-      });
-    };
-  };
-
-  // Handle step confirmation action
-  const handleStepConfirm = (action: ConfirmAction, editedPrompt?: string) => {
-    if (!stepConfirmation) return;
-
-    const { resolve } = stepConfirmation;
-    setStepConfirmation(null);
-
-    switch (action) {
-      case 'yes':
-        resolve({ proceed: true, editedPrompt });
-        break;
-      case 'yes_all':
-        setYesAllMode(true);
-        resolve({ proceed: true, editedPrompt });
-        break;
-      case 'skip':
-        resolve({ proceed: false });
-        break;
-      case 'abort':
-        setYesAllMode(false);
-        resolve({ proceed: false });
-        abortControllerRef.current?.abort();
-        break;
-    }
   };
 
   // Check agent availability on startup
@@ -355,13 +300,7 @@ function App() {
       setPipelineName(workflowName);
       setMode('collaboration');
 
-      abortControllerRef.current = new AbortController();
-      setYesAllMode(false);
-
-      const result = await execute(plan, {
-        onBeforeStep: interactive ? createOnBeforeStep(plan.steps.length) : undefined,
-        signal: abortControllerRef.current.signal,
-      });
+      const result = await execute(plan);
 
       // Build visual collaboration steps from results
       const pipelineSteps: CollaborationStep[] = plan.steps.map((step) => {
@@ -928,13 +867,7 @@ Compare View:
             setPipelineName('Autopilot');
             setMode('collaboration');
 
-            abortControllerRef.current = new AbortController();
-            setYesAllMode(false);
-
-            const result = await execute(plan, {
-              onBeforeStep: interactive ? createOnBeforeStep(plan.steps.length) : undefined,
-              signal: abortControllerRef.current.signal,
-            });
+            const result = await execute(plan);
 
             // Build visual collaboration steps from results
             const pipelineSteps: CollaborationStep[] = plan.steps.map((step) => {
@@ -1001,14 +934,8 @@ Compare View:
         setPipelineName(wfName);
         setMode('collaboration');
 
-        abortControllerRef.current = new AbortController();
-        setYesAllMode(false);
-
         try {
-          const result = await execute(plan, {
-            onBeforeStep: interactive ? createOnBeforeStep(plan.steps.length) : undefined,
-            signal: abortControllerRef.current.signal,
-          });
+          const result = await execute(plan);
 
           // Build visual collaboration steps from results
           const pipelineSteps: CollaborationStep[] = plan.steps.map((step, i) => {
@@ -1377,18 +1304,6 @@ Compare View:
         />
       )}
 
-      {/* Step Confirmation (Interactive Mode) */}
-      {stepConfirmation && (
-        <StepConfirmation
-          stepNumber={stepConfirmation.stepNumber}
-          totalSteps={stepConfirmation.totalSteps}
-          agent={stepConfirmation.step.agent || 'auto'}
-          role={stepConfirmation.step.action || 'execute'}
-          prompt={stepConfirmation.step.prompt}
-          onConfirm={handleStepConfirm}
-          isActive={true}
-        />
-      )}
 
       {/* Notification */}
       {notification && (
@@ -1619,7 +1534,7 @@ Compare View:
               onChange={setInput}
               onSubmit={handleSubmit}
               placeholder={mode === 'chat' ? "Type a message or /help" : "Type to exit view..."}
-              focus={!stepConfirmation && !showUpdatePrompt}
+              focus={!showUpdatePrompt}
             />
           </Box>
 

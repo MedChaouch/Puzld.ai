@@ -6,6 +6,27 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.65] - 2025-12-10
+
+### Added
+- User-friendly error messages in Compare and Pipeline views
+  - Rate limit: `Rate limited (429) - quota exceeded, try again later or switch model`
+  - Timeout: `Timed out after 120s - try a simpler prompt or different model`
+  - Auth, network, server errors with actionable hints
+- Claude 3 Opus model option (`claude-3-opus-20240229`)
+
+### Changed
+- Settings panel reorganized: Config tab now grouped by mode (Pipeline, Compare, Autopilot)
+- Collaboration settings merged into single tab (Correct, Debate, Consensus)
+
+### Fixed
+- Update prompt no longer reappears after updating (skip file mechanism)
+
+### Removed
+- Step confirmation box UI (interactive mode toggle remains)
+
+---
+
 ## [0.2.64] - 2025-12-10
 
 ### Added

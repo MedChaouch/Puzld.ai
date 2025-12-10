@@ -22,6 +22,48 @@ interface CompareViewProps {
 
 type ViewMode = 'side-by-side' | 'expanded' | 'all';
 
+// Format error messages to be more user-friendly
+function formatError(error: string): string {
+  // Rate limit errors (429)
+  if (error.includes('429') || error.includes('Resource exhausted') || error.includes('rate limit')) {
+    return 'Rate limited (429) - quota exceeded, try again later or switch model';
+  }
+  // Authentication errors
+  if (error.includes('401') || error.includes('403') || error.includes('Unauthorized') || error.includes('authentication')) {
+    return 'Auth failed - run the agent CLI directly to re-authenticate';
+  }
+  // Network errors
+  if (error.includes('ENOTFOUND') || error.includes('ECONNREFUSED') || error.includes('network')) {
+    return 'Network error - check your internet connection';
+  }
+  // Timeout
+  if (error.includes('timeout') || error.includes('ETIMEDOUT') || error.includes('Timeout')) {
+    return 'Timed out after 120s - try a simpler prompt or different model';
+  }
+  // Model not found
+  if (error.includes('model') && (error.includes('not found') || error.includes('does not exist'))) {
+    return 'Model not found - check /model list for available models';
+  }
+  // Context length exceeded
+  if (error.includes('context') && (error.includes('length') || error.includes('too long') || error.includes('exceeded'))) {
+    return 'Context too long - try a shorter prompt';
+  }
+  // Server errors (500+)
+  if (error.includes('500') || error.includes('502') || error.includes('503') || error.includes('Internal Server Error')) {
+    return 'Server error (5xx) - the API is having issues, try again later';
+  }
+  // Keep short errors as-is, truncate long ones
+  if (error.length > 150) {
+    // Try to extract a meaningful message
+    const match = error.match(/"message":\s*"([^"]+)"/);
+    if (match) {
+      return match[1].length > 120 ? match[1].slice(0, 120) + '...' : match[1];
+    }
+    return error.slice(0, 120) + '...';
+  }
+  return error;
+}
+
 // Truncate text to N lines
 function truncateLines(text: string, maxLines: number): { text: string; truncated: boolean; remaining: number } {
   const lines = text.split('\n');
@@ -121,7 +163,7 @@ export function CompareView({ results, onExit, inputValue = '', interactive = tr
               <Text color={borderColor}>{'─'.repeat(lineLength)}</Text>
               <Box paddingY={1}>
                 <Text color={isError ? 'red' : undefined} wrap="wrap">
-                  {result.content || result.error || 'No response'}
+                  {result.content || (result.error ? formatError(result.error) : 'No response')}
                 </Text>
               </Box>
               <Text color={borderColor}>
@@ -143,7 +185,7 @@ export function CompareView({ results, onExit, inputValue = '', interactive = tr
         <Box flexDirection="row" width="100%">
           {results.map((result, i) => {
             const { text, truncated, remaining } = truncateLines(
-              result.content || result.error || 'No response',
+              result.content || (result.error ? formatError(result.error) : 'No response'),
               6
             );
             const isError = !!result.error;
@@ -239,7 +281,7 @@ export function CompareView({ results, onExit, inputValue = '', interactive = tr
             <Text color="yellow">● thinking...</Text>
           ) : (
             <Text color={isError ? 'red' : undefined} wrap="wrap">
-              {result.content || result.error || 'No response'}
+              {result.content || (result.error ? formatError(result.error) : 'No response')}
             </Text>
           )}
         </Box>
@@ -283,7 +325,7 @@ export function CompareView({ results, onExit, inputValue = '', interactive = tr
                 <Text color="yellow">● thinking...</Text>
               ) : (
                 <Text color={isError ? 'red' : undefined} wrap="wrap">
-                  {result.content || result.error || 'No response'}
+                  {result.content || (result.error ? formatError(result.error) : 'No response')}
                 </Text>
               )}
             </Box>

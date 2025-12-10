@@ -4,7 +4,7 @@ import { getSessionStats, type AgentSession } from '../../memory';
 
 const HIGHLIGHT = '#8CA9FF';
 
-type SettingsTab = 'status' | 'session' | 'config' | 'correct' | 'debate' | 'consensus';
+type SettingsTab = 'status' | 'session' | 'config' | 'collaboration';
 
 interface SettingsPanelProps {
   onBack: () => void;
@@ -73,17 +73,34 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   const [tab, setTab] = useState<SettingsTab>('status');
   const [configIndex, setConfigIndex] = useState(0);
-  const [debateIndex, setDebateIndex] = useState(0);
-  const [consensusIndex, setConsensusIndex] = useState(0);
 
-  const configOptions: ConfigOption[] = [
-    { key: 'sequential', label: 'Sequential compare', value: sequential, onToggle: onToggleSequential },
-    { key: 'pick', label: 'Pick best from compare', value: pick, onToggle: onTogglePick },
-    { key: 'autoExecute', label: 'Auto-execute autopilot', value: autoExecute, onToggle: onToggleExecute },
-    { key: 'interactive', label: 'Interactive mode', value: interactive, onToggle: onToggleInteractive }
+  // Config options organized by section
+  const configSections = [
+    {
+      title: 'Pipeline / Workflow / Autopilot',
+      options: [
+        { key: 'interactive', label: 'Interactive mode', value: interactive, onToggle: onToggleInteractive }
+      ]
+    },
+    {
+      title: 'Compare',
+      options: [
+        { key: 'sequential', label: 'Sequential', value: sequential, onToggle: onToggleSequential },
+        { key: 'pick', label: 'Pick best', value: pick, onToggle: onTogglePick }
+      ]
+    },
+    {
+      title: 'Autopilot',
+      options: [
+        { key: 'autoExecute', label: 'Auto-execute', value: autoExecute, onToggle: onToggleExecute }
+      ]
+    }
   ];
 
-  const tabs: SettingsTab[] = ['status', 'session', 'config', 'correct', 'debate', 'consensus'];
+  // Flatten for navigation
+  const configOptions: ConfigOption[] = configSections.flatMap(s => s.options);
+
+  const tabs: SettingsTab[] = ['status', 'session', 'config', 'collaboration'];
 
   // Handle tab cycling and escape
   useInput((input, key) => {
@@ -112,63 +129,47 @@ export function SettingsPanel({
     }
   }, { isActive: tab === 'config' });
 
-  // Handle correct tab (just toggle fix)
-  useInput((input, key) => {
-    if (tab !== 'correct') return;
-    if (key.return || input === ' ') {
-      onToggleCorrectFix();
-    }
-  }, { isActive: tab === 'correct' });
+  const [collabIndex, setCollabIndex] = useState(0);
 
-  // Handle debate tab navigation
+  // Handle collaboration tab navigation
+  // 0: correctFix (toggle)
+  // 1: debateRounds (←/→)
+  // 2: debateModerator (←/→)
+  // 3: consensusRounds (←/→)
+  // 4: consensusSynthesizer (←/→)
   useInput((input, key) => {
-    if (tab !== 'debate') return;
+    if (tab !== 'collaboration') return;
 
     if (key.upArrow) {
-      setDebateIndex(i => Math.max(0, i - 1));
+      setCollabIndex(i => Math.max(0, i - 1));
     } else if (key.downArrow) {
-      setDebateIndex(i => Math.min(1, i + 1));
+      setCollabIndex(i => Math.min(4, i + 1));
+    } else if (key.return || input === ' ') {
+      if (collabIndex === 0) onToggleCorrectFix();
     } else if (key.leftArrow) {
-      if (debateIndex === 0) {
-        onSetDebateRounds(Math.max(1, debateRounds - 1));
-      } else {
+      if (collabIndex === 1) onSetDebateRounds(Math.max(1, debateRounds - 1));
+      else if (collabIndex === 2) {
         const idx = AGENTS.indexOf(debateModerator);
         onSetDebateModerator(AGENTS[Math.max(0, idx - 1)]);
       }
-    } else if (key.rightArrow) {
-      if (debateIndex === 0) {
-        onSetDebateRounds(Math.min(5, debateRounds + 1));
-      } else {
-        const idx = AGENTS.indexOf(debateModerator);
-        onSetDebateModerator(AGENTS[Math.min(AGENTS.length - 1, idx + 1)]);
-      }
-    }
-  }, { isActive: tab === 'debate' });
-
-  // Handle consensus tab navigation
-  useInput((input, key) => {
-    if (tab !== 'consensus') return;
-
-    if (key.upArrow) {
-      setConsensusIndex(i => Math.max(0, i - 1));
-    } else if (key.downArrow) {
-      setConsensusIndex(i => Math.min(1, i + 1));
-    } else if (key.leftArrow) {
-      if (consensusIndex === 0) {
-        onSetConsensusRounds(Math.max(1, consensusRounds - 1));
-      } else {
+      else if (collabIndex === 3) onSetConsensusRounds(Math.max(1, consensusRounds - 1));
+      else if (collabIndex === 4) {
         const idx = AGENTS.indexOf(consensusSynthesizer);
         onSetConsensusSynthesizer(AGENTS[Math.max(0, idx - 1)]);
       }
     } else if (key.rightArrow) {
-      if (consensusIndex === 0) {
-        onSetConsensusRounds(Math.min(5, consensusRounds + 1));
-      } else {
+      if (collabIndex === 1) onSetDebateRounds(Math.min(5, debateRounds + 1));
+      else if (collabIndex === 2) {
+        const idx = AGENTS.indexOf(debateModerator);
+        onSetDebateModerator(AGENTS[Math.min(AGENTS.length - 1, idx + 1)]);
+      }
+      else if (collabIndex === 3) onSetConsensusRounds(Math.min(5, consensusRounds + 1));
+      else if (collabIndex === 4) {
         const idx = AGENTS.indexOf(consensusSynthesizer);
         onSetConsensusSynthesizer(AGENTS[Math.min(AGENTS.length - 1, idx + 1)]);
       }
     }
-  }, { isActive: tab === 'consensus' });
+  }, { isActive: tab === 'collaboration' });
 
   // Get session stats
   const sessionStats = session ? getSessionStats(session) : null;
@@ -176,11 +177,9 @@ export function SettingsPanel({
   const getFooterHint = () => {
     switch (tab) {
       case 'config':
-      case 'correct':
-        return 'Enter/Space to toggle · ';
-      case 'debate':
-      case 'consensus':
-        return '←/→ to change · ↑/↓ to navigate · ';
+        return '↑/↓ navigate · Enter/Space toggle · ';
+      case 'collaboration':
+        return '↑/↓ navigate · Enter/Space toggle · ←/→ adjust · ';
       default:
         return '';
     }
@@ -214,23 +213,16 @@ export function SettingsPanel({
           <SessionTab session={session} stats={sessionStats} />
         )}
         {tab === 'config' && (
-          <ConfigTab options={configOptions} selectedIndex={configIndex} />
+          <ConfigTab sections={configSections} options={configOptions} selectedIndex={configIndex} />
         )}
-        {tab === 'correct' && (
-          <CorrectTab fix={correctFix} />
-        )}
-        {tab === 'debate' && (
-          <DebateTab
-            rounds={debateRounds}
-            moderator={debateModerator}
-            selectedIndex={debateIndex}
-          />
-        )}
-        {tab === 'consensus' && (
-          <ConsensusTab
-            rounds={consensusRounds}
-            synthesizer={consensusSynthesizer}
-            selectedIndex={consensusIndex}
+        {tab === 'collaboration' && (
+          <CollaborationTab
+            correctFix={correctFix}
+            debateRounds={debateRounds}
+            debateModerator={debateModerator}
+            consensusRounds={consensusRounds}
+            consensusSynthesizer={consensusSynthesizer}
+            selectedIndex={collabIndex}
           />
         )}
       </Box>
@@ -328,114 +320,111 @@ function SessionTab({ session, stats }: SessionTabProps) {
   );
 }
 
+interface ConfigSection {
+  title: string;
+  options: ConfigOption[];
+}
+
 interface ConfigTabProps {
+  sections: ConfigSection[];
   options: ConfigOption[];
   selectedIndex: number;
 }
 
-function ConfigTab({ options, selectedIndex }: ConfigTabProps) {
+function ConfigTab({ sections, options, selectedIndex }: ConfigTabProps) {
+  let globalIndex = 0;
   return (
     <Box flexDirection="column">
       <Text dimColor>Configure PulzdAI preferences</Text>
       <Box flexDirection="column" marginTop={1}>
-        {options.map((opt, i) => {
-          const isSelected = i === selectedIndex;
-          return (
-            <Box key={opt.key}>
-              <Text color={isSelected ? HIGHLIGHT : undefined}>
-                {isSelected ? '>' : ' '} {opt.label.padEnd(30)}
-              </Text>
-              <Text color={opt.value ? 'green' : 'gray'}>
-                {opt.value ? 'true' : 'false'}
-              </Text>
-            </Box>
-          );
-        })}
+        {sections.map((section) => (
+          <React.Fragment key={section.title}>
+            <Text bold color="cyan">{section.title}</Text>
+            {section.options.map((opt) => {
+              const isSelected = globalIndex === selectedIndex;
+              const currentIndex = globalIndex;
+              globalIndex++;
+              return (
+                <Box key={opt.key}>
+                  <Text color={isSelected ? HIGHLIGHT : undefined}>
+                    {isSelected ? '>' : ' '} {'  ' + opt.label.padEnd(28)}
+                  </Text>
+                  <Text color={opt.value ? 'green' : 'gray'}>
+                    {opt.value ? 'true' : 'false'}
+                  </Text>
+                </Box>
+              );
+            })}
+          </React.Fragment>
+        ))}
       </Box>
     </Box>
   );
 }
 
-// --- Collaboration Tabs ---
+// --- Collaboration Tab (merged Correct, Debate, Consensus) ---
 
-interface CorrectTabProps {
-  fix: boolean;
-}
-
-function CorrectTab({ fix }: CorrectTabProps) {
-  return (
-    <Box flexDirection="column">
-      <Text dimColor>Cross-agent correction settings</Text>
-      <Box flexDirection="column" marginTop={1}>
-        <Box>
-          <Text color={HIGHLIGHT}>&gt; {'Fix after review'.padEnd(30)}</Text>
-          <Text color={fix ? 'green' : 'gray'}>{fix ? 'true' : 'false'}</Text>
-        </Box>
-        <Text dimColor marginTop={1}>
-          When enabled, producer will fix issues identified in review.
-        </Text>
-      </Box>
-    </Box>
-  );
-}
-
-interface DebateTabProps {
-  rounds: number;
-  moderator: string;
+interface CollaborationTabProps {
+  correctFix: boolean;
+  debateRounds: number;
+  debateModerator: string;
+  consensusRounds: number;
+  consensusSynthesizer: string;
   selectedIndex: number;
 }
 
-function DebateTab({ rounds, moderator, selectedIndex }: DebateTabProps) {
+function CollaborationTab({
+  correctFix,
+  debateRounds,
+  debateModerator,
+  consensusRounds,
+  consensusSynthesizer,
+  selectedIndex
+}: CollaborationTabProps) {
   return (
     <Box flexDirection="column">
-      <Text dimColor>Multi-agent debate settings</Text>
+      <Text dimColor>Correct, Debate, Consensus settings</Text>
       <Box flexDirection="column" marginTop={1}>
+        {/* Correct */}
+        <Text bold color="cyan">Correct</Text>
         <Box>
           <Text color={selectedIndex === 0 ? HIGHLIGHT : undefined}>
-            {selectedIndex === 0 ? '>' : ' '} {'Rounds'.padEnd(30)}
+            {selectedIndex === 0 ? '>' : ' '} {'  Fix after review'.padEnd(28)}
           </Text>
-          <Text>◀ {rounds} ▶</Text>
+          <Text color={correctFix ? 'green' : 'gray'}>
+            {correctFix ? 'true' : 'false'}
+          </Text>
         </Box>
+
+        {/* Debate */}
+        <Text bold color="cyan">Debate</Text>
         <Box>
           <Text color={selectedIndex === 1 ? HIGHLIGHT : undefined}>
-            {selectedIndex === 1 ? '>' : ' '} {'Moderator'.padEnd(30)}
+            {selectedIndex === 1 ? '>' : ' '} {'  Rounds'.padEnd(28)}
           </Text>
-          <Text>◀ {moderator} ▶</Text>
-        </Box>
-        <Text dimColor marginTop={1}>
-          Moderator synthesizes final conclusion (none = no synthesis).
-        </Text>
-      </Box>
-    </Box>
-  );
-}
-
-interface ConsensusTabProps {
-  rounds: number;
-  synthesizer: string;
-  selectedIndex: number;
-}
-
-function ConsensusTab({ rounds, synthesizer, selectedIndex }: ConsensusTabProps) {
-  return (
-    <Box flexDirection="column">
-      <Text dimColor>Consensus building settings</Text>
-      <Box flexDirection="column" marginTop={1}>
-        <Box>
-          <Text color={selectedIndex === 0 ? HIGHLIGHT : undefined}>
-            {selectedIndex === 0 ? '>' : ' '} {'Voting rounds'.padEnd(30)}
-          </Text>
-          <Text>◀ {rounds} ▶</Text>
+          <Text>◀ {debateRounds} ▶</Text>
         </Box>
         <Box>
-          <Text color={selectedIndex === 1 ? HIGHLIGHT : undefined}>
-            {selectedIndex === 1 ? '>' : ' '} {'Synthesizer'.padEnd(30)}
+          <Text color={selectedIndex === 2 ? HIGHLIGHT : undefined}>
+            {selectedIndex === 2 ? '>' : ' '} {'  Moderator'.padEnd(28)}
           </Text>
-          <Text>◀ {synthesizer} ▶</Text>
+          <Text>◀ {debateModerator} ▶</Text>
         </Box>
-        <Text dimColor marginTop={1}>
-          Synthesizer creates final output (auto = first agent).
-        </Text>
+
+        {/* Consensus */}
+        <Text bold color="cyan">Consensus</Text>
+        <Box>
+          <Text color={selectedIndex === 3 ? HIGHLIGHT : undefined}>
+            {selectedIndex === 3 ? '>' : ' '} {'  Voting rounds'.padEnd(28)}
+          </Text>
+          <Text>◀ {consensusRounds} ▶</Text>
+        </Box>
+        <Box>
+          <Text color={selectedIndex === 4 ? HIGHLIGHT : undefined}>
+            {selectedIndex === 4 ? '>' : ' '} {'  Synthesizer'.padEnd(28)}
+          </Text>
+          <Text>◀ {consensusSynthesizer} ▶</Text>
+        </Box>
       </Box>
     </Box>
   );

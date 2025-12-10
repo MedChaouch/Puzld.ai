@@ -284,6 +284,10 @@ async function executeStep(
     };
   }
 
+  // Inject variables into prompt before showing confirmation
+  const injectedPrompt = injectVariables(step.prompt, ctx);
+  step = { ...step, prompt: injectedPrompt };
+
   // Interactive confirmation before step
   if (config.onBeforeStep) {
     const previousResults = Object.values(ctx.steps);
@@ -341,9 +345,10 @@ async function executeStep(
     // Try fallback on last attempt
     if (attempt === maxRetries && step.fallback) {
       try {
+        // Prompt is already injected, use it directly
         const fallbackResult = await runAdapter(
           step.fallback,
-          injectVariables(step.prompt, ctx),
+          step.prompt,
           config,
           step.id
         );
@@ -386,7 +391,8 @@ async function executeStepOnce(
   config: ExecutorConfig,
   _emit: (event: Omit<TimelineEvent, 'timestamp'>) => void
 ): Promise<StepResult> {
-  const prompt = injectVariables(step.prompt, ctx);
+  // Prompt is already injected before onBeforeStep, use it directly
+  const prompt = step.prompt;
 
   // Resolve agent (auto-route if needed)
   let agent = step.agent;
