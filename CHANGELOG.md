@@ -6,6 +6,15 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.62] - 2025-12-10
+
+### Added
+- Update check on TUI startup - prompts when newer version available
+- Boxed prompt with [U] Update / [S] Skip options
+- Auto-publish to npm via GitHub Actions on release
+
+---
+
 ## [0.2.6] - 2025-12-09
 
 ### Added
