@@ -78,6 +78,12 @@ Or try without installing:
 npx puzldai
 ```
 
+**Update:**
+
+```bash
+npm update -g puzldai
+```
+
 ---
 
 ## Quick Start

@@ -41,6 +41,9 @@ import {
   clearSessionHistory,
   type AgentSession
 } from '../memory';
+import { checkForUpdate } from '../lib/updateCheck';
+import { UpdatePrompt } from './components/UpdatePrompt';
+import { execa } from 'execa';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8'));
@@ -100,6 +103,9 @@ function App() {
   const [notification, setNotification] = useState<string | null>(null);
   const [agentStatus, setAgentStatus] = useState<AgentStatus[]>([]);
   const [session, setSession] = useState<AgentSession | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<{ current: string; latest: string } | null>(null);
+  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Value options
   const [currentAgent, setCurrentAgent] = useState('auto');
@@ -178,6 +184,35 @@ function App() {
       setNotification('Router offline, using fallback agent');
     });
   }, []);
+
+  // Check for updates on startup
+  useEffect(() => {
+    checkForUpdate().then(info => {
+      if (info.hasUpdate) {
+        setUpdateInfo({ current: info.currentVersion, latest: info.latestVersion });
+        setShowUpdatePrompt(true);
+      }
+    });
+  }, []);
+
+  // Handle update action
+  const handleUpdate = async () => {
+    setIsUpdating(true);
+    setShowUpdatePrompt(false);
+    setNotification('Updating PuzldAI...');
+    try {
+      await execa('npm', ['update', '-g', 'puzldai']);
+      setNotification('Updated! Restart puzldai to use the new version.');
+    } catch {
+      setNotification('Update failed. Run: npm update -g puzldai');
+    }
+    setIsUpdating(false);
+  };
+
+  // Handle skip update
+  const handleSkipUpdate = () => {
+    setShowUpdatePrompt(false);
+  };
 
   // Check agent availability on startup
   useEffect(() => {
@@ -1251,6 +1286,16 @@ Compare View:
     <Box flexDirection="column" padding={1}>
       {/* Banner */}
       <Banner version={pkg.version} agents={agentStatus} />
+
+      {/* Update Prompt */}
+      {showUpdatePrompt && updateInfo && (
+        <UpdatePrompt
+          currentVersion={updateInfo.current}
+          latestVersion={updateInfo.latest}
+          onUpdate={handleUpdate}
+          onSkip={handleSkipUpdate}
+        />
+      )}
 
       {/* Notification */}
       {notification && (

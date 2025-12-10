@@ -1,6 +1,6 @@
 {
   "name": "puzldai",
-  "version": "0.2.61",
+  "version": "0.2.62",
   "description": "Multi-LLM Orchestrator - Route tasks intelligently across Claude, Gemini, Codex, and local models",
   "type": "module",
   "bin": {
