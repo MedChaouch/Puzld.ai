@@ -42,6 +42,13 @@ export const KNOWN_MODELS: Record<string, AgentModels> = {
   ollama: {
     aliases: [],
     models: []  // Dynamically populated via `ollama list`
+  },
+  mistral: {
+    aliases: ['devstral-2', 'devstral-small', 'local'],
+    models: [
+      'mistral-vibe-cli-latest',
+      'devstral-small-latest'
+    ]
   }
 };
 

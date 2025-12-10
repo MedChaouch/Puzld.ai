@@ -4,7 +4,7 @@ import { getModelSuggestions, isModelAlias } from '../../lib/models';
 
 const HIGHLIGHT = '#8CA9FF';
 
-type AgentTab = 'claude' | 'gemini' | 'codex' | 'ollama';
+type AgentTab = 'claude' | 'gemini' | 'codex' | 'ollama' | 'mistral';
 
 interface ModelPanelProps {
   onBack: () => void;
@@ -13,11 +13,13 @@ interface ModelPanelProps {
   geminiModel: string;
   codexModel: string;
   ollamaModel: string;
+  mistralModel: string;
   // Setters (parent handles persistence, returns warning if unknown model)
   onSetClaudeModel: (model: string) => string | undefined;
   onSetGeminiModel: (model: string) => string | undefined;
   onSetCodexModel: (model: string) => string | undefined;
   onSetOllamaModel: (model: string) => string | undefined;
+  onSetMistralModel: (model: string) => string | undefined;
 }
 
 export function ModelPanel({
@@ -26,16 +28,18 @@ export function ModelPanel({
   geminiModel,
   codexModel,
   ollamaModel,
+  mistralModel,
   onSetClaudeModel,
   onSetGeminiModel,
   onSetCodexModel,
-  onSetOllamaModel
+  onSetOllamaModel,
+  onSetMistralModel
 }: ModelPanelProps) {
   const [tab, setTab] = useState<AgentTab>('claude');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [warning, setWarning] = useState<string | undefined>();
 
-  const tabs: AgentTab[] = ['claude', 'gemini', 'codex', 'ollama'];
+  const tabs: AgentTab[] = ['claude', 'gemini', 'codex', 'ollama', 'mistral'];
 
   const getCurrentModel = () => {
     switch (tab) {
@@ -43,6 +47,7 @@ export function ModelPanel({
       case 'gemini': return geminiModel;
       case 'codex': return codexModel;
       case 'ollama': return ollamaModel;
+      case 'mistral': return mistralModel;
     }
   };
 
@@ -63,6 +68,7 @@ export function ModelPanel({
       case 'gemini': result = onSetGeminiModel(model); break;
       case 'codex': result = onSetCodexModel(model); break;
       case 'ollama': result = onSetOllamaModel(model); break;
+      case 'mistral': result = onSetMistralModel(model); break;
     }
     setWarning(result);
   };
@@ -107,6 +113,7 @@ export function ModelPanel({
       case 'gemini': return 'Gemini';
       case 'codex': return 'Codex';
       case 'ollama': return 'Ollama';
+      case 'mistral': return 'Mistral';
     }
   };
 

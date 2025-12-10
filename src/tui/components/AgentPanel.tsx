@@ -24,6 +24,7 @@ export function AgentPanel({ currentAgent, agentStatus, onSelect, onBack }: Agen
     { id: 'gemini', name: 'Gemini CLI', description: 'Google', ready: agentStatus.find(a => a.name === 'gemini')?.ready ?? false },
     { id: 'codex', name: 'Codex', description: 'OpenAI', ready: agentStatus.find(a => a.name === 'codex')?.ready ?? false },
     { id: 'ollama', name: 'Ollama', description: 'Local', ready: agentStatus.find(a => a.name === 'ollama')?.ready ?? false },
+    { id: 'mistral', name: 'Mistral Vibe', description: 'Mistral', ready: agentStatus.find(a => a.name === 'mistral')?.ready ?? false },
   ];
 
   const currentIndex = agents.findIndex(a => a.id === currentAgent);

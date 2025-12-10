@@ -3,7 +3,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 
 export interface PulzdConfig {
-  defaultAgent: 'auto' | 'claude' | 'gemini' | 'codex' | 'ollama';
+  defaultAgent: 'auto' | 'claude' | 'gemini' | 'codex' | 'ollama' | 'mistral';
   routerModel: string;
   timeout: number;
   fallbackAgent: string;
@@ -14,6 +14,7 @@ export interface PulzdConfig {
     gemini: { enabled: boolean; path: string; model?: string };
     codex: { enabled: boolean; path: string; model?: string };
     ollama: { enabled: boolean; model: string; host: string; maxTokens?: number };
+    mistral?: { enabled: boolean; path: string; model?: string };
   };
   api: { port: number; host: string };
   ttyd: { port: number; enabled: boolean };
@@ -35,7 +36,8 @@ const DEFAULT_CONFIG: PulzdConfig = {
     claude: { enabled: true, path: 'claude' },
     gemini: { enabled: true, path: 'gemini' },
     codex: { enabled: false, path: 'codex' },
-    ollama: { enabled: true, model: 'llama3.2', host: 'http://localhost:11434' }
+    ollama: { enabled: true, model: 'llama3.2', host: 'http://localhost:11434' },
+    mistral: { enabled: true, path: 'vibe' }
   },
   api: { port: 3000, host: '0.0.0.0' },
   ttyd: { port: 3001, enabled: true }

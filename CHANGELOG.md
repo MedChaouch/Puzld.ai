@@ -6,6 +6,26 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.67] - 2025-12-10
+
+### Added
+- **Mistral Vibe CLI adapter** - New agent powered by Devstral models
+  - Uses `vibe` CLI with streaming output for fast responses (~1.5s)
+  - Available via `/agent mistral` or agent panel
+  - Shown in banner status panel
+- Mistral tab in Model panel (`/model`)
+
+### Changed
+- **Faster adapter responses** via streaming output modes:
+  - Mistral: `--output streaming` (~45% faster)
+  - Claude: `--output-format stream-json` (~25% faster)
+- Updated `/agent` and `/model` help to include mistral
+
+### Fixed
+- Mistral adapter no longer passes invalid `--agent` flag for model selection
+
+---
+
 ## [0.2.66] - 2025-12-10
 
 ### Added

@@ -2,15 +2,15 @@ import { execa } from 'execa';
 import type { Adapter, ModelResponse, RunOptions } from '../lib/types';
 import { getConfig } from '../lib/config';
 
-export const claudeAdapter: Adapter = {
-  name: 'claude',
+export const mistralAdapter: Adapter = {
+  name: 'mistral',
 
   async isAvailable(): Promise<boolean> {
     const config = getConfig();
-    if (!config.adapters.claude.enabled) return false;
+    if (!config.adapters.mistral?.enabled) return false;
 
     try {
-      await execa('which', [config.adapters.claude.path]);
+      await execa('which', [config.adapters.mistral.path || 'vibe']);
       return true;
     } catch {
       return false;
@@ -20,19 +20,17 @@ export const claudeAdapter: Adapter = {
   async run(prompt: string, options?: RunOptions): Promise<ModelResponse> {
     const config = getConfig();
     const startTime = Date.now();
-    const model = options?.model ?? config.adapters.claude.model;
+    const model = options?.model ?? config.adapters.mistral?.model;
 
     try {
-      // claude -p "prompt" for non-interactive output
-      // --tools "" disables all tools to prevent permission prompts
-      // --output-format stream-json for faster response (requires --verbose)
-      const args = ['-p', prompt, '--tools', '', '--output-format', 'stream-json', '--verbose'];
-      if (model) {
-        args.push('--model', model);
-      }
+      // vibe -p "prompt" for programmatic mode
+      // --output streaming for fastest response (newline-delimited JSON)
+      // --auto-approve to skip tool confirmations
+      // Note: vibe doesn't have a CLI flag for model selection - it uses active_model in config
+      const args = ['-p', prompt, '--output', 'streaming', '--auto-approve'];
 
       const { stdout, stderr } = await execa(
-        config.adapters.claude.path,
+        config.adapters.mistral?.path || 'vibe',
         args,
         {
           timeout: config.timeout,
@@ -42,7 +40,7 @@ export const claudeAdapter: Adapter = {
         }
       );
 
-      const modelName = model ? `claude/${model}` : 'claude';
+      const modelName = model ? `mistral/${model}` : 'mistral';
 
       if (stderr && !stdout) {
         return {
@@ -53,26 +51,25 @@ export const claudeAdapter: Adapter = {
         };
       }
 
-      // Parse stream-json response (newline-delimited JSON)
+      // Parse streaming JSON response (newline-delimited JSON)
       try {
+        // Split by newlines and parse each line
         const lines = stdout.trim().split('\n');
         let content = '';
         let inputTokens = 0;
         let outputTokens = 0;
-        let isError = false;
 
         for (const line of lines) {
           if (!line.trim()) continue;
           try {
-            const json = JSON.parse(line);
-            // Get result from final result message
-            if (json.type === 'result') {
-              content = json.result || '';
-              isError = json.is_error || false;
-              if (json.usage) {
-                inputTokens = json.usage.input_tokens || 0;
-                outputTokens = json.usage.output_tokens || 0;
-              }
+            const msg = JSON.parse(line);
+            if (msg.role === 'assistant' && msg.content) {
+              content = msg.content;
+            }
+            // Look for usage info
+            if (msg.usage) {
+              inputTokens += msg.usage.prompt_tokens || msg.usage.input_tokens || 0;
+              outputTokens += msg.usage.completion_tokens || msg.usage.output_tokens || 0;
             }
           } catch {
             // Skip malformed lines
@@ -86,11 +83,10 @@ export const claudeAdapter: Adapter = {
           tokens: (inputTokens || outputTokens) ? {
             input: inputTokens,
             output: outputTokens
-          } : undefined,
-          error: isError ? content : undefined
+          } : undefined
         };
       } catch {
-        // Fallback if parsing fails
+        // Fallback if parsing fails - return raw output
         return {
           content: stdout || '',
           model: modelName,
@@ -99,7 +95,7 @@ export const claudeAdapter: Adapter = {
       }
     } catch (err: unknown) {
       const error = err as Error;
-      const modelName = model ? `claude/${model}` : 'claude';
+      const modelName = model ? `mistral/${model}` : 'mistral';
       return {
         content: '',
         model: modelName,

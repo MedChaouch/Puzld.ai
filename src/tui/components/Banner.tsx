@@ -106,8 +106,8 @@ export function Banner({ version = '0.1.0', minimal = false, agents = [], change
   // Get changelog items
   const changelogItems = changelog || getLatestChangelog();
 
-  // Default order for display: claude, gemini, codex, ollama
-  const agentOrder = ['claude', 'gemini', 'codex', 'ollama'];
+  // Default order for display: claude, gemini, codex, ollama, mistral
+  const agentOrder = ['claude', 'gemini', 'codex', 'ollama', 'mistral'];
   const defaultAgents: AgentStatus[] = agents.length > 0
     ? agentOrder.map(name => agents.find(a => a.name === name) || { name, ready: false })
     : agentOrder.map(name => ({ name, ready: false }));
@@ -288,9 +288,34 @@ export function Banner({ version = '0.1.0', minimal = false, agents = [], change
         );
       })()}
 
-      {/* Changelog items */}
-      {changelogItems.map((item, i) => (
-        <Box key={`changelog-${i}`}>
+      {/* Changelog item 1 + Agent 5 (mistral) */}
+      {(() => {
+        const agent = defaultAgents[4];
+        const bullet = agent.ready ? '●' : '○';
+        const statusText = agent.ready ? 'ready' : 'off';
+        const nameAndStatus = `${agent.name.padEnd(7)} ${statusText}`;
+        const contentLen = 1 + 1 + nameAndStatus.length;
+        const totalPad = RIGHT_WIDTH - contentLen;
+        const leftPadAmt = Math.floor(totalPad / 2);
+        const rightPadAmt = totalPad - leftPadAmt;
+        const item = changelogItems[0];
+        return (
+          <Box key="changelog-0-agent5">
+            <Text color={BORDER}>{BOX.v}</Text>
+            <Text dimColor>{pad('  - ' + (item?.text || ''), LEFT_WIDTH)}</Text>
+            <Text color={BORDER}>{BOX.v}</Text>
+            <Text>{' '.repeat(leftPadAmt)}</Text>
+            <Text color={agent.ready ? 'green' : GRAY}>{bullet}</Text>
+            <Text> {nameAndStatus}</Text>
+            <Text>{' '.repeat(Math.max(0, rightPadAmt))}</Text>
+            <Text color={BORDER}>{BOX.v}</Text>
+          </Box>
+        );
+      })()}
+
+      {/* Remaining changelog items */}
+      {changelogItems.slice(1).map((item, i) => (
+        <Box key={`changelog-${i + 1}`}>
           <Text color={BORDER}>{BOX.v}</Text>
           <Text dimColor>{pad('  - ' + item.text, LEFT_WIDTH)}</Text>
           <Text color={BORDER}>{BOX.v}</Text>

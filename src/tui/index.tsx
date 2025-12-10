@@ -147,6 +147,7 @@ function App() {
   const [geminiModel, setGeminiModel] = useState(config.adapters.gemini.model || cliDefaults.gemini || '');
   const [codexModel, setCodexModel] = useState(config.adapters.codex.model || cliDefaults.codex || '');
   const [ollamaModel, setOllamaModel] = useState(config.adapters.ollama.model || cliDefaults.ollama || '');
+  const [mistralModel, setMistralModel] = useState(config.adapters.mistral?.model || '');
 
   // Model setters that persist to config (returns warning if unknown model)
   const handleSetClaudeModel = (model: string): string | undefined => {
@@ -185,6 +186,19 @@ function App() {
     cfg.adapters.ollama.model = model;
     saveConfig(cfg);
     // Ollama models are dynamic, no warning needed
+  };
+  const handleSetMistralModel = (model: string): string | undefined => {
+    setMistralModel(model);
+    const cfg = getConfig();
+    if (!cfg.adapters.mistral) {
+      cfg.adapters.mistral = { enabled: true, path: 'vibe' };
+    }
+    cfg.adapters.mistral.model = model;
+    saveConfig(cfg);
+    const known = getModelSuggestions('mistral');
+    if (known.length > 0 && !known.includes(model)) {
+      return `Warning: "${model}" not in known models. It may still work.`;
+    }
   };
 
   const { addToHistory, navigateHistory } = useHistory();
@@ -558,7 +572,7 @@ Multi-Agent Collaboration:
   /consensus <agents> <task>    - Build consensus (rounds in settings)
 
 Options:
-  /agent [name]     - Show/set agent (claude, gemini, codex, ollama, auto)
+  /agent [name]     - Show/set agent (claude, gemini, codex, ollama, mistral, auto)
   /model [agent] [model] - Show/set model (or open model panel)
   /router [name]    - Show/set routing agent
   /planner [name]   - Show/set autopilot planner agent
@@ -609,7 +623,7 @@ Compare View:
           // /model <agent> [model] - show or set model for agent
           const [agent, ...modelParts] = rest.split(' ');
           const modelName = modelParts.join(' ');
-          if (['claude', 'gemini', 'codex', 'ollama'].includes(agent)) {
+          if (['claude', 'gemini', 'codex', 'ollama', 'mistral'].includes(agent)) {
             if (modelName) {
               // Set model
               switch (agent) {
@@ -617,6 +631,7 @@ Compare View:
                 case 'gemini': handleSetGeminiModel(modelName); break;
                 case 'codex': handleSetCodexModel(modelName); break;
                 case 'ollama': handleSetOllamaModel(modelName); break;
+                case 'mistral': handleSetMistralModel(modelName); break;
               }
               addMessage(`Model for ${agent} set to: ${modelName}`);
             } else {
@@ -627,11 +642,12 @@ Compare View:
                 case 'gemini': currentModel = geminiModel; break;
                 case 'codex': currentModel = codexModel; break;
                 case 'ollama': currentModel = ollamaModel; break;
+                case 'mistral': currentModel = mistralModel; break;
               }
               addMessage(`${agent} model: ${currentModel || '(default)'}`);
             }
           } else {
-            addMessage('Unknown agent. Use: claude, gemini, codex, ollama');
+            addMessage('Unknown agent. Use: claude, gemini, codex, ollama, mistral');
           }
         } else {
           // /model - open model panel
@@ -1385,10 +1401,12 @@ Compare View:
           geminiModel={geminiModel}
           codexModel={codexModel}
           ollamaModel={ollamaModel}
+          mistralModel={mistralModel}
           onSetClaudeModel={handleSetClaudeModel}
           onSetGeminiModel={handleSetGeminiModel}
           onSetCodexModel={handleSetCodexModel}
           onSetOllamaModel={handleSetOllamaModel}
+          onSetMistralModel={handleSetMistralModel}
         />
       )}
 

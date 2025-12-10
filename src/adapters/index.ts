@@ -3,12 +3,14 @@ import { claudeAdapter } from './claude';
 import { geminiAdapter } from './gemini';
 import { codexAdapter } from './codex';
 import { ollamaAdapter } from './ollama';
+import { mistralAdapter } from './mistral';
 
 export const adapters: Record<string, Adapter> = {
   claude: claudeAdapter,
   gemini: geminiAdapter,
   codex: codexAdapter,
-  ollama: ollamaAdapter
+  ollama: ollamaAdapter,
+  mistral: mistralAdapter
 };
 
 export async function getAvailableAdapters(): Promise<Adapter[]> {
@@ -21,4 +23,4 @@ export async function getAvailableAdapters(): Promise<Adapter[]> {
   return available;
 }
 
-export { claudeAdapter, geminiAdapter, codexAdapter, ollamaAdapter };
+export { claudeAdapter, geminiAdapter, codexAdapter, ollamaAdapter, mistralAdapter };
