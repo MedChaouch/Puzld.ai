@@ -140,6 +140,63 @@ function createSchema(database: Database.Database): void {
   database.prepare(
     "INSERT OR IGNORE INTO metadata (key, value) VALUES ('schema_version', '1')"
   ).run();
+
+  // Run migrations
+  runMigrations(database);
+}
+
+/**
+ * Run all migrations
+ */
+function runMigrations(database: Database.Database): void {
+  const currentVersion = parseInt(
+    (database.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").get() as { value: string })?.value || '1',
+    10
+  );
+
+  // Migration 2: Add observations table (Phase 10)
+  if (currentVersion < 2) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS observations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT,
+        timestamp INTEGER NOT NULL,
+
+        -- Input
+        prompt TEXT NOT NULL,
+        injected_context TEXT,
+        agent TEXT NOT NULL,
+        model TEXT,
+
+        -- Output
+        response TEXT,
+        explanation TEXT,
+        proposed_files TEXT,
+
+        -- Review decisions
+        accepted_files TEXT,
+        rejected_files TEXT,
+
+        -- User modifications
+        user_edits TEXT,
+        final_files TEXT,
+
+        -- Metadata
+        duration_ms INTEGER,
+        tokens_in INTEGER,
+        tokens_out INTEGER,
+
+        FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE SET NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_observations_session ON observations(session_id);
+      CREATE INDEX IF NOT EXISTS idx_observations_agent ON observations(agent);
+      CREATE INDEX IF NOT EXISTS idx_observations_timestamp ON observations(timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_observations_model ON observations(model);
+    `);
+
+    database.prepare("UPDATE metadata SET value = '2' WHERE key = 'schema_version'").run();
+  }
 }
 
 /**

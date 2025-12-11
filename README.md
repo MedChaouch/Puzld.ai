@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>One CLI. Multiple AI agents. Infinite possibilities.</strong>
+  <strong>Multi-LLM orchestration with agentic execution, memory, and training data generation.</strong>
 </p>
 
 <p align="center">
@@ -22,9 +22,9 @@
 
 ---
 
-> **Stop switching between AI CLIs.** PuzldAI routes your tasks to the right agent automatically — or lets you orchestrate them together.
+> **Beyond CLI wrappers.** PuzldAI is a complete AI orchestration framework — route tasks, execute file edits, build memory, and generate training data.
 
-PuzldAI is a fast, terminal-native framework for orchestrating multiple AI agents. It doesn't replace your AI tools—it connects them. Route tasks to the best agent automatically, compare responses side-by-side, chain agents in pipelines, or let them collaborate through correction, debate, and consensus. One CLI to rule them all.
+PuzldAI is a terminal-native framework for orchestrating multiple AI agents. Route tasks to the best agent, compare responses, chain agents in pipelines, or let them collaborate. But that's just the start: **Agentic Mode** lets LLMs propose file edits you review before applying. **Memory/RAG** stores decisions and code for future context. **Observation Layer** logs everything for DPO fine-tuning. One framework that grows with your AI workflow.
 
 ---
 
@@ -38,6 +38,9 @@ PuzldAI is a fast, terminal-native framework for orchestrating multiple AI agent
 | Complex tasks need multiple steps | **Pipelines** chain agents together |
 | Repetitive workflows | **Workflows** save and reuse pipelines |
 | Need agents to review each other | **Collaboration** — correct, debate, consensus |
+| Want LLM to edit files safely | **Agentic mode** — propose, review, apply |
+| Context gets lost between sessions | **Memory/RAG** — semantic retrieval of past decisions |
+| Need data to fine-tune models | **Observations** — export DPO training pairs |
 
 ---
 
@@ -50,6 +53,9 @@ PuzldAI is a fast, terminal-native framework for orchestrating multiple AI agent
 - **Workflows** — Save pipelines as templates, run anywhere (TUI & CLI)
 - **Autopilot** — Describe the goal. AI builds the plan.
 - **Multi-Agent Collaboration** — Correct, debate, and build consensus across agents.
+- **Agentic Mode** — LLMs propose file edits, you review and apply. [EXPERIMENTAL]
+- **Memory/RAG** — Semantic retrieval injects relevant context into prompts.
+- **Observation Layer** — Logs all interactions for training data generation.
 - **Sessions** — Persist chat history, resume conversations.
 - **TUI** — Full terminal UI with autocomplete, history, keyboard nav.
 
@@ -135,6 +141,7 @@ puzldai check
 | **Correct** | Producer → Reviewer → Fix | Quality assurance, code review | Collaboration |
 | **Debate** | Agents argue in rounds, optional moderator | Find flaws in reasoning | Collaboration |
 | **Consensus** | Propose → Vote → Synthesize | High-confidence answers | Collaboration |
+| **Agentic** | LLM proposes → User reviews → Apply | File edits with approval | Execution |
 
 ### Mode Options
 
@@ -355,6 +362,87 @@ Configure rounds, moderator, and synthesizer in `/settings`.
 
 ---
 
+## Agentic Mode [EXPERIMENTAL]
+
+Let LLMs propose file edits that you review before applying. PuzldAI acts as the execution layer — the LLM proposes JSON, you decide what gets written.
+
+```bash
+# TUI
+/agentic "create a hello world script at hello.sh"
+/agentic "fix the bug in src/utils.ts"
+/agentic "add error handling to api/routes.ts"
+```
+
+**How it works:**
+1. You describe the task
+2. LLM returns structured JSON with file operations (create/edit/delete)
+3. You review each proposed change with a diff view
+4. Accept, reject, or skip each file individually
+
+**Review controls:**
+- `[A]` Accept — Apply this edit
+- `[R]` Reject — Skip this edit
+- `[S]` Skip — Decide later
+- `[Y]` Yes All — Accept all remaining
+- `[N]` No All — Reject all remaining
+- `←/→` Navigate between files
+- `↑/↓` Scroll diff
+
+Files mentioned in your task are automatically injected as context (up to 10KB each).
+
+---
+
+## Memory & Context
+
+PuzldAI includes a memory system that stores conversations, decisions, and code patterns for future retrieval.
+
+**Memory types:**
+- `conversation` — Q&A pairs from sessions
+- `decision` — Accepted file edits and explanations
+- `code` — Code snippets and patterns
+- `pattern` — Reusable solutions
+
+**How it works:**
+- Observations from `/agentic` are automatically saved to memory
+- When you accept file edits, the decision is stored for future context
+- Semantic search retrieves relevant memories for new prompts
+- Uses SQLite FTS5 (zero dependencies) or Ollama embeddings when available
+
+**Embedding models (auto-detected):**
+- `nomic-embed-text` (recommended)
+- `mxbai-embed-large`
+- `all-minilm`
+
+---
+
+## Observation Layer
+
+All `/agentic` interactions are logged for training data generation:
+
+- **Inputs:** Prompts, injected context, agent/model used
+- **Outputs:** LLM responses, proposed files, explanations
+- **Decisions:** Which files were accepted/rejected
+- **Edits:** User modifications to proposed content
+
+**Export for fine-tuning:**
+
+```typescript
+import { exportObservations, exportPreferencePairs } from 'puzldai/observation';
+
+// Export all observations as JSONL
+exportObservations({ outputPath: 'observations.jsonl', format: 'jsonl' });
+
+// Export DPO training pairs (chosen vs rejected)
+exportPreferencePairs({ outputPath: 'preferences.jsonl', format: 'jsonl' });
+```
+
+**DPO pair types:**
+- `accept_reject` — User accepted some files, rejected others
+- `user_edit` — User modified the LLM's proposed content
+- `full_reject` — User rejected all proposed files
+
+---
+
 ## Commands
 
 ### TUI Mode
@@ -368,6 +456,8 @@ Configure rounds, moderator, and synthesizer in `/settings`.
 /correct claude gemini "task"   Cross-agent correction
 /debate claude,gemini "topic"   Multi-agent debate
 /consensus claude,gemini "task" Build consensus
+
+/agentic "task"                 [EXPERIMENTAL] Review file edits
 
 /session                        Start new session
 /resume                         Resume previous session
@@ -459,14 +549,24 @@ User Input
 │ CLI/TUI │────▶│ Orchestrator│────▶│ Adapters │
 └─────────┘     └────────────┘     └──────────┘
                       │                  │
-                      ▼                  ▼
-               ┌───────────┐      ┌─────────────┐
-               │  Router   │      │ Claude      │
-               │ (Ollama)  │      │ Gemini      │
-               └───────────┘      │ Codex       │
-                                  │ Ollama      │
-                                  │ Mistral     │
-                                  └─────────────┘
+        ┌─────────────┼─────────────┐    │
+        ▼             ▼             ▼    ▼
+ ┌───────────┐ ┌───────────┐ ┌──────────────┐
+ │  Router   │ │  Memory   │ │   Agents     │
+ │ (Ollama)  │ │  (RAG)    │ │ Claude       │
+ └───────────┘ └───────────┘ │ Gemini       │
+        │             │      │ Codex        │
+        ▼             ▼      │ Ollama       │
+ ┌───────────┐ ┌───────────┐ │ Mistral      │
+ │ Agentic   │ │Observation│ └──────────────┘
+ │ Executor  │ │  Logger   │
+ └───────────┘ └───────────┘
+        │             │
+        ▼             ▼
+ ┌───────────┐ ┌───────────┐
+ │   Diff    │ │  Export   │
+ │  Review   │ │  (DPO)    │
+ └───────────┘ └───────────┘
 ```
 
 ---

@@ -1,7 +1,7 @@
 {
   "name": "puzldai",
-  "version": "0.2.73",
-  "description": "Multi-LLM Orchestrator - Route tasks intelligently across Claude, Gemini, Codex, and local models",
+  "version": "0.2.74",
+  "description": "Multi-LLM orchestration framework with agentic execution, memory/RAG, and training data generation",
   "type": "module",
   "bin": {
     "puzld": "dist/cli/index.js",

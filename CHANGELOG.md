@@ -6,6 +6,26 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.74] - 2025-12-11
+
+### Added
+- **Phase 10: Observation Layer** - Log all interactions for training data
+  - `src/observation/logger.ts` - Lifecycle logging (start → response → review → complete)
+  - `src/observation/diff-tracker.ts` - Track user edits with unified diff format
+  - `src/observation/preference-extractor.ts` - Generate DPO training pairs
+  - `src/observation/exporter.ts` - Export to JSONL/JSON/CSV formats
+  - SQLite `observations` table via migration (schema v2)
+  - Captures: prompts, injected context, responses, proposed files, accepted/rejected decisions, user edits
+  - Auto-saves accepted decisions and conversations to memory store (Phase 11 bridge)
+
+### Changed
+- `/agentic` command now logs full interaction lifecycle for training data generation
+- DiffReview completion logs review decisions to observations table
+- README rewritten: new tagline, architecture diagram, full documentation for Agentic/Memory/Observation features
+- Package description updated to reflect framework evolution beyond CLI wrapper
+
+---
+
 ## [0.2.73] - 2025-12-11
 
 ### Added

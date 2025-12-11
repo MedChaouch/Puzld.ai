@@ -50,6 +50,12 @@ import type { PlanStep, StepResult } from '../executor';
 import { claudeAdapter, type DryRunResult } from '../adapters/claude';
 import type { ProposedEdit } from '../lib/edit-review';
 import { runAgentic, formatFileContext, type AgenticResult } from '../agentic';
+import {
+  startObservation,
+  logResponse,
+  logReviewDecision,
+  completeObservation
+} from '../observation';
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -105,6 +111,8 @@ function App() {
   const [pipelineName, setPipelineName] = useState<string>('');
   const [notification, setNotification] = useState<string | null>(null);
   const [proposedEdits, setProposedEdits] = useState<ProposedEdit[]>([]);
+  const [currentObservationId, setCurrentObservationId] = useState<number | null>(null);
+  const [currentAgenticResult, setCurrentAgenticResult] = useState<AgenticResult | null>(null);
   const [agentStatus, setAgentStatus] = useState<AgentStatus[]>([]);
   const [session, setSession] = useState<AgentSession | null>(null);
   const [updateInfo, setUpdateInfo] = useState<{ current: string; latest: string } | null>(null);
@@ -715,13 +723,39 @@ Compare View:
             }
           }
 
+          // Start observation logging
+          const fileContext = files.length > 0 ? files.map(f => `${f.path}:\n${f.content}`).join('\n\n') : undefined;
+          const observationId = startObservation({
+            sessionId: session?.id,
+            prompt: task,
+            injectedContext: fileContext,
+            agent: agentName
+          });
+
+          const startTime = Date.now();
           const result = await runAgentic(task, {
             adapter,
             projectRoot: process.cwd(),
             files: files.length > 0 ? files : undefined
           });
 
+          // Log response to observation
+          logResponse(observationId, {
+            response: result.rawResponse?.content,
+            explanation: result.agenticResponse?.explanation,
+            proposedFiles: result.agenticResponse?.files?.map(f => ({
+              path: f.path,
+              operation: f.operation,
+              content: f.content
+            })),
+            durationMs: Date.now() - startTime,
+            tokensIn: result.rawResponse?.tokensIn,
+            tokensOut: result.rawResponse?.tokensOut
+          });
+
           if (!result.success) {
+            // Complete observation (no review needed)
+            completeObservation(observationId);
             // Show detailed error with raw response hint
             let errorMsg = `Agentic error: ${result.error}`;
             if (result.rawResponse?.content) {
@@ -734,6 +768,8 @@ Compare View:
           }
 
           if (!result.proposedEdits || result.proposedEdits.length === 0) {
+            // Complete observation (no review needed)
+            completeObservation(observationId);
             // Show the explanation if no file edits
             const explanation = result.agenticResponse?.explanation || result.rawResponse.content || 'No file edits proposed.';
             // Add context about what happened
@@ -754,6 +790,10 @@ Compare View:
           ).join('\n');
           const explanation = result.agenticResponse?.explanation || '';
           addMessage(`${explanation}\n\n${agentName} proposed ${result.proposedEdits.length} file edit(s):\n${editSummary}\n\nReview each edit below:`, agentName);
+
+          // Store observation ID and result for review completion
+          setCurrentObservationId(observationId);
+          setCurrentAgenticResult(result);
 
           // Switch to review mode
           setProposedEdits(result.proposedEdits);
@@ -1586,6 +1626,28 @@ Compare View:
         <DiffReview
           edits={proposedEdits}
           onComplete={(result) => {
+            // Log review decision to observation
+            if (currentObservationId !== null) {
+              // Build final files record from accepted edits
+              const finalFiles: Record<string, string> = {};
+              for (const edit of proposedEdits) {
+                if (result.accepted.includes(edit.filePath) && edit.newContent) {
+                  finalFiles[edit.filePath] = edit.newContent;
+                }
+              }
+
+              logReviewDecision(currentObservationId, {
+                acceptedFiles: result.accepted,
+                rejectedFiles: result.rejected,
+                finalFiles: Object.keys(finalFiles).length > 0 ? finalFiles : undefined
+              });
+
+              // Complete observation (saves to memory)
+              completeObservation(currentObservationId);
+              setCurrentObservationId(null);
+              setCurrentAgenticResult(null);
+            }
+
             const summary: string[] = [];
             if (result.accepted.length > 0) {
               summary.push('Applied ' + result.accepted.length + ' file(s)');
@@ -1606,6 +1668,17 @@ Compare View:
             setMode('chat');
           }}
           onCancel={() => {
+            // Log cancellation as full rejection
+            if (currentObservationId !== null) {
+              const allPaths = proposedEdits.map(e => e.filePath);
+              logReviewDecision(currentObservationId, {
+                rejectedFiles: allPaths
+              });
+              completeObservation(currentObservationId);
+              setCurrentObservationId(null);
+              setCurrentAgenticResult(null);
+            }
+
             setMessages(prev => [...prev, {
               id: nextId(),
               role: 'assistant',
