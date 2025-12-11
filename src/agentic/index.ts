@@ -15,6 +15,7 @@ import type { ProposedEdit } from '../lib/edit-review';
 import {
   wrapPrompt,
   wrapSimplePrompt,
+  wrapPromptWithMemory,
   formatFileContext,
   formatMemoryContext,
   type WrappedPrompt,
@@ -218,6 +219,7 @@ export {
   // Prompt wrapper
   wrapPrompt,
   wrapSimplePrompt,
+  wrapPromptWithMemory,
   formatFileContext,
   formatMemoryContext,
   // Response parser

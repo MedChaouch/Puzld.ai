@@ -6,6 +6,24 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.73] - 2025-12-11
+
+### Added
+- **Phase 11: Memory/RAG** - Semantic retrieval for context injection
+  - `src/memory/embeddings.ts` - Ollama embeddings with FTS5 fallback
+  - `src/memory/vector-store.ts` - SQLite FTS5 + optional LanceDB for vector search
+  - `src/memory/retriever.ts` - High-level search with scoring and filtering
+  - `src/memory/injector.ts` - Format context for XML (Claude) or Markdown (others)
+  - Memory types: conversation, code, decision, pattern, context
+  - Auto-detects Ollama embedding models (nomic-embed-text, mxbai-embed, all-minilm)
+  - Zero new required dependencies (FTS5 built into SQLite)
+
+### Changed
+- `wrapPromptWithMemory()` auto-retrieves relevant context from memory store
+- Memory index updated with new RAG exports
+
+---
+
 ## [0.2.72] - 2025-12-11
 
 ### Added

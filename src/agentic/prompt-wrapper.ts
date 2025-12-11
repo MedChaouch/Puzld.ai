@@ -6,6 +6,7 @@
  */
 
 import { estimateTokens } from '../context/tokens';
+import { buildInjectionForAgent } from '../memory/injector';
 
 export interface PromptWrapperOptions {
   /** Files to inject as context */
@@ -18,6 +19,10 @@ export interface PromptWrapperOptions {
   agent?: string;
   /** Max tokens for the prompt (will warn if exceeded) */
   maxTokens?: number;
+  /** Auto-retrieve memory context (Phase 11) */
+  autoRetrieveMemory?: boolean;
+  /** Max tokens for auto-retrieved memory */
+  memoryMaxTokens?: number;
 }
 
 export interface WrappedPrompt {
@@ -150,6 +155,45 @@ export function formatMemoryContext(items: Array<{ type: string; content: string
   return items
     .map(item => `[${item.type}] ${item.content}`)
     .join('\n');
+}
+
+/**
+ * Wraps a user task with auto-retrieved memory context
+ * This is async because it fetches from the memory store
+ */
+export async function wrapPromptWithMemory(
+  task: string,
+  options: PromptWrapperOptions = {}
+): Promise<WrappedPrompt> {
+  const { agent = 'claude', memoryMaxTokens = 1000 } = options;
+
+  // Build memory context from retriever
+  let memoryContext = options.memoryContext;
+
+  if (options.autoRetrieveMemory !== false) {
+    try {
+      const injection = await buildInjectionForAgent(task, agent, {
+        maxTokens: memoryMaxTokens,
+        includeConversation: true,
+        includeCode: true,
+        includeDecisions: true,
+        includePatterns: true
+      });
+
+      if (injection.content && injection.itemCount > 0) {
+        memoryContext = memoryContext
+          ? `${memoryContext}\n\n${injection.content}`
+          : injection.content;
+      }
+    } catch {
+      // Silently continue without memory if retrieval fails
+    }
+  }
+
+  return wrapPrompt(task, {
+    ...options,
+    memoryContext
+  });
 }
 
 export { SYSTEM_PROMPT, AGENT_HINTS };

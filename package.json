@@ -1,6 +1,6 @@
 {
   "name": "puzldai",
-  "version": "0.2.72",
+  "version": "0.2.73",
   "description": "Multi-LLM Orchestrator - Route tasks intelligently across Claude, Gemini, Codex, and local models",
   "type": "module",
   "bin": {
@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@fastify/static": "^8.0.0",
+    "@lancedb/lancedb": "^0.22.3",
     "better-sqlite3": "^12.5.0",
     "commander": "^12.1.0",
     "diff": "^8.0.2",
