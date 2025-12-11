@@ -1,6 +1,7 @@
 import { execa } from 'execa';
 import type { Adapter, ModelResponse, RunOptions } from '../lib/types';
 import { getConfig } from '../lib/config';
+import { StreamParser, type ResultEvent } from '../lib/stream-parser';
 
 export const claudeAdapter: Adapter = {
   name: 'claude',
@@ -53,41 +54,36 @@ export const claudeAdapter: Adapter = {
         };
       }
 
-      // Parse stream-json response (newline-delimited JSON)
+      // Parse stream-json response using StreamParser
       try {
-        const lines = stdout.trim().split('\n');
-        let content = '';
-        let inputTokens = 0;
-        let outputTokens = 0;
-        let isError = false;
+        const parser = new StreamParser();
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const json = JSON.parse(line);
-            // Get result from final result message
-            if (json.type === 'result') {
-              content = json.result || '';
-              isError = json.is_error || false;
-              if (json.usage) {
-                inputTokens = json.usage.input_tokens || 0;
-                outputTokens = json.usage.output_tokens || 0;
-              }
-            }
-          } catch {
-            // Skip malformed lines
-          }
+        // Subscribe to tool events if callback provided
+        if (options?.onToolEvent) {
+          parser.onEvent(options.onToolEvent);
         }
 
+        // Parse all lines (emits events to subscribers)
+        parser.parseAll(stdout);
+
+        // Get final result
+        const resultEvent = parser.getResult();
+        const result: ResultEvent = resultEvent ?? {
+          type: 'result',
+          subtype: 'success',
+          result: '',
+          isError: false
+        };
+
         return {
-          content,
+          content: result.result,
           model: modelName,
           duration: Date.now() - startTime,
-          tokens: (inputTokens || outputTokens) ? {
-            input: inputTokens,
-            output: outputTokens
+          tokens: result.usage ? {
+            input: result.usage.input_tokens,
+            output: result.usage.output_tokens
           } : undefined,
-          error: isError ? content : undefined
+          error: result.isError ? result.result : undefined
         };
       } catch {
         // Fallback if parsing fails

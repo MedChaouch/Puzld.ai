@@ -12,6 +12,7 @@ export interface ModelResponse {
 export interface RunOptions {
   signal?: AbortSignal;
   onChunk?: (chunk: string) => void;
+  onToolEvent?: (event: import('./stream-parser').StreamEvent) => void;
   model?: string;
 }
 

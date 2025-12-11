@@ -6,6 +6,23 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.71] - 2025-12-11
+
+### Added
+- **Phase 9.1: Tool Call Visibility** - Stream parser for Claude CLI JSONL output
+  - `StreamParser` class parses `--output-format stream-json --verbose` output
+  - Supports multiple tool calls/results per message (parallel tool use)
+  - Event types: `init`, `tool_call`, `tool_result`, `text`, `result`, `error`
+  - `formatToolCall()` utility for display formatting
+  - `getToolIcon()` for tool-specific icons
+  - Full test coverage (21 tests)
+
+### Changed
+- Claude adapter now uses `StreamParser` for cleaner JSONL parsing
+- Added `onToolEvent` callback to `RunOptions` for real-time tool visibility
+
+---
+
 ## [0.2.70] - 2025-12-11
 
 ### Added
