@@ -19,6 +19,9 @@ export function IndexPanel({ onSelect, onBack }: IndexPanelProps) {
     { id: 'full', name: 'Full Index', description: 'Index codebase with embeddings' },
     { id: 'quick', name: 'Quick Index', description: 'Index without embeddings (faster)' },
     { id: 'search', name: 'Search', description: 'Search indexed code' },
+    { id: 'context', name: 'Context', description: 'Get relevant code for a task' },
+    { id: 'config', name: 'Config', description: 'Show project configuration' },
+    { id: 'graph', name: 'Graph', description: 'Show dependency graph' },
   ];
 
   const [selectedIndex, setSelectedIndex] = useState(0);

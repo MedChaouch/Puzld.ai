@@ -61,8 +61,14 @@ import {
   indexCodebase,
   getIndexSummary,
   getConfigSummary,
-  searchCode
+  getGraphSummary,
+  searchCode,
+  getTaskContext,
+  detectProjectConfig,
+  buildDependencyGraph,
+  parseFiles
 } from '../indexing';
+import { globSync } from 'glob';
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -601,7 +607,12 @@ function App() {
   /agentic <task>           - [EXPERIMENTAL] Review file edits (any agent)
   /review <task>            - Review file edits (Claude dry-run mode)
   /index                    - Codebase indexing options
+  /index full               - Index with embeddings
+  /index quick              - Index without embeddings
   /index search <query>     - Search indexed code
+  /index context <task>     - Get relevant code for task
+  /index config             - Show project configuration
+  /index graph              - Show dependency graph
   /session                  - Start new session
   /resume                   - Resume a previous session
 
@@ -686,7 +697,64 @@ Compare View:
             addMessage('Search error: ' + (err as Error).message, 'system');
           }
           setLoading(false);
-        } else {
+        } else if (subCmd === 'context') {
+          // Get relevant code context for a task
+          if (!searchQuery) {
+            addMessage('Usage: /index context <task>\nExample: /index context "fix auth bug"', 'system');
+            break;
+          }
+          setLoading(true);
+          setLoadingText('getting relevant context...');
+          try {
+            const context = await getTaskContext(searchQuery, process.cwd(), {
+              maxFiles: 5,
+              maxTotalSize: 30 * 1024
+            });
+            if (context.files.length === 0) {
+              addMessage('No relevant files found.', 'system');
+            } else {
+              let msg = 'Found ' + context.files.length + ' relevant files (' + (context.totalSize / 1024).toFixed(1) + 'KB):\n\n';
+              for (const file of context.files) {
+                msg += '--- ' + file.path + ' (' + file.reason + ') ---\n';
+                msg += file.content + '\n\n';
+              }
+              addMessage(msg.trim(), 'system');
+            }
+          } catch (err) {
+            addMessage('Context error: ' + (err as Error).message, 'system');
+          }
+          setLoading(false);
+        } else if (subCmd === 'config') {
+          // Show project configuration
+          try {
+            const config = detectProjectConfig(process.cwd());
+            if (config.configFiles.length === 0) {
+              addMessage('No project configuration files found.\n\nSupported: AGENTS.md, CLAUDE.md, .cursorrules, copilot-instructions.md', 'system');
+            } else {
+              addMessage('Project Configuration:\n' + getConfigSummary(config), 'system');
+            }
+          } catch (err) {
+            addMessage('Config error: ' + (err as Error).message, 'system');
+          }
+        } else if (subCmd === 'graph') {
+          // Show dependency graph
+          setLoading(true);
+          setLoadingText('building dependency graph...');
+          try {
+            const rootDir = process.cwd();
+            const files = globSync('**/*.{ts,tsx,js,jsx}', {
+              cwd: rootDir,
+              absolute: true,
+              ignore: ['**/node_modules/**', '**/dist/**', '**/build/**']
+            }).slice(0, 500);
+            const structures = parseFiles(files, rootDir);
+            const graph = buildDependencyGraph(structures, rootDir);
+            addMessage('Dependency Graph:\n' + getGraphSummary(graph), 'system');
+          } catch (err) {
+            addMessage('Graph error: ' + (err as Error).message, 'system');
+          }
+          setLoading(false);
+        } else if (subCmd === 'full' || subCmd === 'quick') {
           // Index current directory
           setLoading(true);
           setLoadingText('indexing codebase...');
@@ -702,6 +770,8 @@ Compare View:
             addMessage('Index error: ' + (err as Error).message, 'system');
           }
           setLoading(false);
+        } else {
+          addMessage('Unknown subcommand: ' + subCmd + '\n\nUsage: /index [full|quick|search|context|config|graph]', 'system');
         }
         break;
       }
@@ -1705,7 +1775,41 @@ Compare View:
             if (option === 'search') {
               setInput('/index search ');
               setInputKey(k => k + 1);
+            } else if (option === 'context') {
+              setInput('/index context ');
+              setInputKey(k => k + 1);
+            } else if (option === 'config') {
+              // Show config immediately
+              try {
+                const config = detectProjectConfig(process.cwd());
+                if (config.configFiles.length === 0) {
+                  setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'No project configuration files found.\n\nSupported: AGENTS.md, CLAUDE.md, .cursorrules, copilot-instructions.md', agent: 'system' }]);
+                } else {
+                  setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'Project Configuration:\n' + getConfigSummary(config), agent: 'system' }]);
+                }
+              } catch (err) {
+                setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'Config error: ' + (err as Error).message, agent: 'system' }]);
+              }
+            } else if (option === 'graph') {
+              // Build and show graph
+              setLoading(true);
+              setLoadingText('building dependency graph...');
+              try {
+                const rootDir = process.cwd();
+                const files = globSync('**/*.{ts,tsx,js,jsx}', {
+                  cwd: rootDir,
+                  absolute: true,
+                  ignore: ['**/node_modules/**', '**/dist/**', '**/build/**']
+                }).slice(0, 500);
+                const structures = parseFiles(files, rootDir);
+                const graph = buildDependencyGraph(structures, rootDir);
+                setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'Dependency Graph:\n' + getGraphSummary(graph), agent: 'system' }]);
+              } catch (err) {
+                setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'Graph error: ' + (err as Error).message, agent: 'system' }]);
+              }
+              setLoading(false);
             } else {
+              // full or quick index
               setLoading(true);
               setLoadingText('indexing codebase...');
               try {
