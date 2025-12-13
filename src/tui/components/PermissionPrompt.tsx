@@ -59,7 +59,7 @@ export function PermissionPrompt({ request, onDecision }: PermissionPromptProps)
       <Box flexDirection="column">
         {options.map((option, i) => (
           <Box key={i}>
-            <Text color={i === selectedIndex ? 'cyan' : 'white'}>
+            <Text bold={i === selectedIndex} color={i === selectedIndex ? '#8CA9FF' : undefined} dimColor={i !== selectedIndex}>
               {i === selectedIndex ? '>' : ' '} {i + 1}. {option.label}
             </Text>
           </Box>

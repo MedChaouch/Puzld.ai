@@ -21,12 +21,10 @@ export const geminiAdapter: Adapter = {
     const config = getConfig();
     const startTime = Date.now();
     const model = options?.model ?? config.adapters.gemini.model;
-    // Note: Gemini CLI doesn't have native file tools, so disableTools is a no-op
-    const _disableTools = options?.disableTools ?? true;
 
     try {
       // Gemini CLI uses -m for model selection, --output-format json for token usage
-      // Use full flag name for compatibility with older versions
+      // Gemini CLI is context-aware and auto-reads project files
       const args: string[] = ['--output-format', 'json'];
       if (model) {
         args.push('-m', model);

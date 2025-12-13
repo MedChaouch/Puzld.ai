@@ -3,6 +3,7 @@
 import type { Adapter, ModelResponse, RunOptions } from '../lib/types';
 import { allTools, executeTools, executeTool, getTool } from './tools';
 import type { Tool, ToolCall, ToolResult, AgentMessage } from './tools/types';
+import { globSync } from 'glob';
 import {
   type PermissionRequest,
   type PermissionResult,
@@ -18,6 +19,21 @@ const READ_TOOLS = ['view', 'grep', 'glob'];
 const WRITE_TOOLS = ['write', 'edit'];
 // Tools that require execute permission
 const EXEC_TOOLS = ['bash'];
+
+// Tool name aliases - maps common LLM naming patterns to our tools
+const TOOL_ALIASES: Record<string, string> = {
+  'read_file': 'view', 'read': 'view', 'cat': 'view', 'file_read': 'view',
+  'find': 'glob', 'find_files': 'glob', 'list_files': 'glob', 'search_files': 'glob',
+  'search': 'grep', 'search_content': 'grep', 'find_in_files': 'grep',
+  'shell': 'bash', 'run': 'bash', 'execute': 'bash', 'run_command': 'bash',
+  'write_file': 'write', 'create_file': 'write', 'file_write': 'write',
+  'update': 'edit', 'modify': 'edit', 'replace': 'edit', 'file_edit': 'edit',
+};
+
+// Normalize tool name using aliases
+function normalizeToolName(name: string): string {
+  return TOOL_ALIASES[name] || name;
+}
 
 export interface AgentLoopOptions extends RunOptions {
   /** Tools available to the agent (default: all tools) */
@@ -67,6 +83,9 @@ export async function runAgentLoop(
   const allToolResults: ToolResult[] = [];
   const messages: AgentMessage[] = [];
 
+  // Get project structure overview (file listing - not contents)
+  const projectFiles = getProjectStructure(cwd);
+
   // Build tool descriptions for system prompt
   const toolDescriptions = tools.map(t => {
     const params = Object.entries(t.parameters.properties || {})
@@ -78,13 +97,21 @@ export async function runAgentLoop(
 
   const systemPrompt = `You are a helpful coding assistant with access to tools. You can explore the codebase and make changes.
 
+IMPORTANT: You MUST use tools to read files. You CANNOT see file contents without using the 'view' tool. Do NOT pretend or hallucinate file contents.
+
+# Project Structure
+
+Here are the files in the current project (use 'view' tool to read their contents):
+
+${projectFiles}
+
 # Available Tools
 
 ${toolDescriptions}
 
 # How to Use Tools
 
-To use a tool, respond with a JSON block:
+To use a tool, you MUST respond with a JSON block in this EXACT format:
 
 \`\`\`tool
 {
@@ -95,6 +122,13 @@ To use a tool, respond with a JSON block:
 }
 \`\`\`
 
+CRITICAL:
+- You MUST use \`\`\`tool (not \`\`\`json or any other format)
+- You CANNOT read files without using the 'view' tool
+- You CANNOT search files without using 'glob' or 'grep' tools
+- Do NOT say "I read the file" unless you actually used the view tool
+- Do NOT make up or assume file contents
+
 You can call multiple tools by including multiple \`\`\`tool blocks.
 
 After using tools, you'll receive the results and can continue exploring or provide your final response.
@@ -103,13 +137,14 @@ When you're done and ready to give your final answer, just respond normally with
 
 # Guidelines
 
-- Use 'glob' and 'grep' to find relevant files
-- Use 'view' to read file contents before editing
+- Use 'glob' to find files by pattern (e.g., "**/*.ts")
+- Use 'grep' to search file contents for patterns
+- Use 'view' to read file contents - YOU MUST DO THIS before claiming to know what's in a file
 - Use 'edit' for targeted changes to existing files
 - Use 'write' for new files or complete rewrites
 - Use 'bash' for running commands (build, test, git, etc.)
-- Explore thoroughly before making changes
-- Explain your reasoning before and after tool use`;
+- Always explore using tools before answering questions about the codebase
+- Never claim to have read a file if you haven't used the view tool`;
 
   // Initial message
   messages.push({ role: 'user', content: userMessage });
@@ -205,6 +240,9 @@ When you're done and ready to give your final answer, just respond normally with
       results.push(result);
       options.onToolResult?.(result);
       allToolResults.push(result);
+
+      // Small delay to ensure UI updates between tool calls
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     // If cancelled, return early
@@ -300,16 +338,20 @@ async function checkAndRequestPermission(
   cwd: string,
   handler?: PermissionHandler
 ): Promise<PermissionResult> {
-  const path = call.arguments.path as string | undefined;
-  const command = call.arguments.command as string | undefined;
+  // Normalize tool name (handle aliases like read_file -> view)
+  const toolName = normalizeToolName(call.name);
 
-  // Determine action type
+  // Handle different argument names (file_path -> path, etc.)
+  const path = (call.arguments.path || call.arguments.file_path || call.arguments.file) as string | undefined;
+  const command = (call.arguments.command || call.arguments.cmd) as string | undefined;
+
+  // Determine action type using normalized name
   let action: 'read' | 'write' | 'execute';
-  if (READ_TOOLS.includes(call.name)) {
+  if (READ_TOOLS.includes(toolName)) {
     action = 'read';
-  } else if (WRITE_TOOLS.includes(call.name)) {
+  } else if (WRITE_TOOLS.includes(toolName)) {
     action = 'write';
-  } else if (EXEC_TOOLS.includes(call.name)) {
+  } else if (EXEC_TOOLS.includes(toolName)) {
     action = 'execute';
   } else {
     // Unknown tool type, allow by default
@@ -327,13 +369,13 @@ async function checkAndRequestPermission(
     return { decision: 'allow' };
   }
 
-  // Request permission
+  // Request permission (use normalized name)
   const request: PermissionRequest = {
     action,
-    tool: call.name,
+    tool: toolName,
     path: fullPath,
     command,
-    description: getPermissionDescription(call),
+    description: getPermissionDescription(toolName, call.arguments),
   };
 
   const result = await handler(request);
@@ -349,22 +391,80 @@ async function checkAndRequestPermission(
 /**
  * Get human-readable description for permission request
  */
-function getPermissionDescription(call: ToolCall): string {
-  switch (call.name) {
+function getPermissionDescription(toolName: string, args: Record<string, unknown>): string {
+  // Handle different argument names
+  const path = args.path || args.file_path || args.file;
+  const pattern = args.pattern;
+  const command = args.command || args.cmd;
+
+  switch (toolName) {
     case 'view':
-      return `Read contents of file: ${call.arguments.path}`;
+      return `Read contents of file: ${path}`;
     case 'glob':
-      return `Search for files matching: ${call.arguments.pattern}`;
+      return `Search for files matching: ${pattern}`;
     case 'grep':
-      return `Search file contents for: ${call.arguments.pattern}`;
+      return `Search file contents for: ${pattern}`;
     case 'write':
-      return `Create/overwrite file: ${call.arguments.path}`;
+      return `Create/overwrite file: ${path}`;
     case 'edit':
-      return `Edit file: ${call.arguments.path}`;
+      return `Edit file: ${path}`;
     case 'bash':
-      return `Execute command: ${call.arguments.command}`;
+      return `Execute command: ${command}`;
     default:
-      return `Execute tool: ${call.name}`;
+      return `Execute tool: ${toolName}`;
+  }
+}
+
+/**
+ * Get project structure (file listing) for context
+ * Returns a tree-like listing of important files
+ */
+function getProjectStructure(cwd: string): string {
+  try {
+    // Get key project files
+    const patterns = [
+      'README.md',
+      'package.json',
+      'tsconfig.json',
+      'go.mod',
+      'Cargo.toml',
+      'requirements.txt',
+      'src/**/*.{ts,tsx,js,jsx}',
+      'lib/**/*.{ts,tsx,js,jsx}',
+      'app/**/*.{ts,tsx,js,jsx}',
+      'pages/**/*.{ts,tsx,js,jsx}',
+      'components/**/*.{ts,tsx,js,jsx}',
+      '*.{ts,tsx,js,jsx,go,rs,py}',
+    ];
+
+    const files: string[] = [];
+    for (const pattern of patterns) {
+      const matches = globSync(pattern, {
+        cwd,
+        ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'],
+        nodir: true,
+      });
+      files.push(...matches);
+    }
+
+    // Dedupe and sort
+    const uniqueFiles = [...new Set(files)].sort();
+
+    // Limit to 100 files to avoid huge prompts
+    const limited = uniqueFiles.slice(0, 100);
+
+    if (limited.length === 0) {
+      return '(No files found - use glob tool to explore)';
+    }
+
+    let result = limited.join('\n');
+    if (uniqueFiles.length > 100) {
+      result += `\n... and ${uniqueFiles.length - 100} more files`;
+    }
+
+    return result;
+  } catch {
+    return '(Unable to list files - use glob tool to explore)';
   }
 }
 

@@ -68,6 +68,7 @@ import {
 } from '../agentic';
 import { ToolActivity, type ToolCallInfo } from './components/ToolActivity';
 import { PermissionPrompt } from './components/PermissionPrompt';
+import { AgentStatus } from './components/AgentStatus';
 import {
   startObservation,
   logResponse,
@@ -105,6 +106,7 @@ interface Message {
   collaborationSteps?: CollaborationStep[];
   collaborationType?: CollaborationType;
   pipelineName?: string;
+  toolCalls?: ToolCallInfo[];
 }
 
 let messageId = 0;
@@ -164,6 +166,8 @@ function App() {
   // Tool activity state (for background display like Claude Code)
   const [toolActivity, setToolActivity] = useState<ToolCallInfo[]>([]);
   const [toolIteration, setToolIteration] = useState(0);
+  const [loadingStartTime, setLoadingStartTime] = useState<number | undefined>();
+  const [loadingAgent, setLoadingAgent] = useState<string>('');
 
   // Permission prompt state
   const [pendingPermission, setPendingPermission] = useState<{
@@ -946,6 +950,8 @@ Keep your response concise and focused on the plan, not the implementation.`;
 
     setMessages(prev => [...prev, { id: nextId(), role: 'user', content: userMessage }]);
     setLoading(true);
+    setLoadingAgent(agentName);
+    setLoadingStartTime(Date.now());
     setLoadingText(`${agentName} is thinking...`);
 
     // Reset tool activity
@@ -1042,14 +1048,16 @@ Keep your response concise and focused on the plan, not the implementation.`;
         } catch { /* Not valid JSON, treat as normal response */ }
       }
 
-      // Normal response
+      // Normal response - include tool calls from exploration
+      const currentToolCalls = [...toolActivity];
       setMessages(prev => [...prev, {
         id: nextId(),
         role: 'assistant',
         content,
         agent: agentName,
         duration,
-        tokens: result.tokens
+        tokens: result.tokens,
+        toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined
       }]);
 
       if (result.tokens) {
@@ -1061,6 +1069,7 @@ Keep your response concise and focused on the plan, not the implementation.`;
       setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'Error: ' + (err as Error).message }]);
     }
     setLoading(false);
+    setLoadingStartTime(undefined);
   };
 
   /* LEGACY DIRECT CHAT CODE - Commented out, now routing through /plan by default
@@ -2495,6 +2504,10 @@ Compare View:
                     </Text>
                   ) : (
                     <Box flexDirection="column">
+                      {/* Tool calls history from exploration */}
+                      {msg.toolCalls && msg.toolCalls.length > 0 && (
+                        <ToolActivity calls={msg.toolCalls} iteration={0} />
+                      )}
                       {msg.agent === 'autopilot' ? (
                         <Text>
                           <Text color="#fc8657">──</Text>
@@ -2568,13 +2581,6 @@ Compare View:
             </>
           )}
 
-          {/* Loading */}
-          {loading && (
-            <Box marginBottom={1}>
-              <Text color="yellow">● {loadingText}</Text>
-            </Box>
-          )}
-
           {/* Tool Activity (shows when agent is using tools) */}
           {loading && toolActivity.length > 0 && (
             <ToolActivity calls={toolActivity} iteration={toolIteration} />
@@ -2585,6 +2591,15 @@ Compare View:
             <PermissionPrompt
               request={pendingPermission.request}
               onDecision={handlePermissionDecision}
+            />
+          )}
+
+          {/* Agent Status Line (shows at bottom with timer) */}
+          {loading && !pendingPermission && (
+            <AgentStatus
+              agentName={loadingAgent || 'Agent'}
+              isLoading={loading}
+              startTime={loadingStartTime}
             />
           )}
 

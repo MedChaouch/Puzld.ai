@@ -6,6 +6,38 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.83] - 2025-12-13
+
+### Changed
+- **Permission Prompt UX Improvements**
+  - Vertical selection with arrow keys (↑↓) instead of keyboard shortcuts
+  - Selection color matches dropdown menu (#8CA9FF)
+  - Input box hidden when permission prompt is shown
+  - Esc to cancel, Enter to confirm
+
+- **Tool Activity Display Refresh**
+  - Removed emojis, uses colored status dots (● green/yellow/red/gray)
+  - Tool names in white, targets in default color
+  - Tree characters (│ └) for result hierarchy
+  - Shows truncated results with "(ctrl+s to expand)" hint
+  - Read, Glob, Grep, Bash, Write, Update action labels
+
+- **Tool Name Aliasing** - LLM-agnostic tool resolution
+  - Maps common LLM tool names to our tools (read_file→view, find→glob, shell→bash)
+  - Argument normalization (file_path→path, cmd→command)
+  - Works with Claude, Gemini, and other LLMs' naming conventions
+
+### Added
+- **Tool History Persistence** - Tool activity persists in message history
+  - `toolCalls` field added to Message interface
+  - Tool calls saved with response message for history display
+
+### Fixed
+- Gemini now works properly with permission system via system prompt instructions
+- Tool calls execute sequentially (was parallel, causing UI issues)
+
+---
+
 ## [0.2.82] - 2025-12-13
 
 ### Added

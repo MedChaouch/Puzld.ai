@@ -38,9 +38,62 @@ export const shellTools: Tool[] = [
   bashTool,
 ];
 
-// Get tool by name
+// Tool name aliases - maps common LLM naming patterns to our tools
+const TOOL_ALIASES: Record<string, string> = {
+  // View aliases
+  'read_file': 'view',
+  'read': 'view',
+  'cat': 'view',
+  'file_read': 'view',
+  // Glob aliases
+  'find': 'glob',
+  'find_files': 'glob',
+  'list_files': 'glob',
+  'search_files': 'glob',
+  // Grep aliases
+  'search': 'grep',
+  'search_content': 'grep',
+  'find_in_files': 'grep',
+  // Bash aliases
+  'shell': 'bash',
+  'run': 'bash',
+  'execute': 'bash',
+  'run_command': 'bash',
+  // Write aliases
+  'write_file': 'write',
+  'create_file': 'write',
+  'file_write': 'write',
+  // Edit aliases
+  'update': 'edit',
+  'modify': 'edit',
+  'replace': 'edit',
+  'file_edit': 'edit',
+};
+
+// Get tool by name (with alias support)
 export function getTool(name: string): Tool | undefined {
-  return allTools.find(t => t.name === name);
+  const normalizedName = TOOL_ALIASES[name] || name;
+  return allTools.find(t => t.name === normalizedName);
+}
+
+// Normalize argument names to match our tool parameter names
+function normalizeArguments(toolName: string, args: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = { ...args };
+
+  // Map file_path -> path
+  if (args.file_path && !args.path) {
+    normalized.path = args.file_path;
+  }
+  if (args.file && !args.path) {
+    normalized.path = args.file;
+  }
+
+  // Map cmd -> command
+  if (args.cmd && !args.command) {
+    normalized.command = args.cmd;
+  }
+
+  return normalized;
 }
 
 // Execute a tool call
@@ -48,7 +101,8 @@ export async function executeTool(
   call: ToolCall,
   cwd: string
 ): Promise<ToolResult> {
-  const tool = getTool(call.name);
+  const normalizedName = TOOL_ALIASES[call.name] || call.name;
+  const tool = getTool(normalizedName);
 
   if (!tool) {
     return {
@@ -59,7 +113,9 @@ export async function executeTool(
   }
 
   try {
-    const result = await tool.execute(call.arguments, cwd);
+    // Normalize arguments to match tool parameter names
+    const normalizedArgs = normalizeArguments(normalizedName, call.arguments);
+    const result = await tool.execute(normalizedArgs, cwd);
     return {
       ...result,
       toolCallId: call.id,
