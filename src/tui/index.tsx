@@ -166,6 +166,7 @@ function App() {
   // Tool activity state (for background display like Claude Code)
   const [toolActivity, setToolActivity] = useState<ToolCallInfo[]>([]);
   const [toolIteration, setToolIteration] = useState(0);
+  const [toolsExpanded, setToolsExpanded] = useState(false);
   const [loadingStartTime, setLoadingStartTime] = useState<number | undefined>();
   const [loadingAgent, setLoadingAgent] = useState<string>('');
 
@@ -233,6 +234,13 @@ function App() {
         setIsReEnteringCollaboration(true); // Don't save again on exit
         setMode('collaboration');
       }
+    }
+  });
+
+  // Ctrl+S to toggle expanded tool view
+  useInput((input, key) => {
+    if (key.ctrl && input === 's' && loading && toolActivity.length > 0) {
+      setToolsExpanded(prev => !prev);
     }
   });
 
@@ -934,8 +942,12 @@ Keep your response concise and focused on the plan, not the implementation.`;
   // Handle permission decisions from PermissionPrompt
   const handlePermissionDecision = (decision: PermissionDecision) => {
     if (pendingPermission) {
-      pendingPermission.resolve({ decision });
+      // Capture reference before clearing state
+      const { resolve } = pendingPermission;
+      // Clear UI immediately
       setPendingPermission(null);
+      // Then resolve promise (triggers next tool)
+      resolve({ decision });
     }
   };
 
@@ -1065,11 +1077,21 @@ Keep your response concise and focused on the plan, not the implementation.`;
       }
 
       setMode('chat');
+      setToolsExpanded(false); // Reset expanded state
     } catch (err) {
-      setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'Error: ' + (err as Error).message }]);
+      // Save error message with tool calls so history is preserved
+      const currentToolCalls = [...toolActivity];
+      setMessages(prev => [...prev, {
+        id: nextId(),
+        role: 'assistant',
+        content: 'Error: ' + (err as Error).message,
+        agent: agentName,
+        toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined
+      }]);
     }
     setLoading(false);
     setLoadingStartTime(undefined);
+    setToolsExpanded(false); // Reset expanded state
   };
 
   /* LEGACY DIRECT CHAT CODE - Commented out, now routing through /plan by default
@@ -2583,7 +2605,7 @@ Compare View:
 
           {/* Tool Activity (shows when agent is using tools) */}
           {loading && toolActivity.length > 0 && (
-            <ToolActivity calls={toolActivity} iteration={toolIteration} />
+            <ToolActivity calls={toolActivity} iteration={toolIteration} expanded={toolsExpanded} />
           )}
 
           {/* Permission Prompt (shows when tool needs user approval) */}

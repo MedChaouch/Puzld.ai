@@ -24,8 +24,10 @@ export const geminiAdapter: Adapter = {
 
     try {
       // Gemini CLI uses -m for model selection, --output-format json for token usage
-      // Gemini CLI is context-aware and auto-reads project files
+      // Note: Gemini CLI auto-reads project context - no reliable way to disable this
+      // The --sandbox flag causes broken responses, so we accept Gemini's native behavior
       const args: string[] = ['--output-format', 'json'];
+
       if (model) {
         args.push('-m', model);
       }

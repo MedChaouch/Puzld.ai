@@ -6,6 +6,39 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.84] - 2025-12-13
+
+### Changed
+- **Adapter-Specific System Prompts** - Each CLI gets tailored instructions
+  - Mistral: Explicit "OUTPUT ```tool blocks as text" instructions
+  - Gemini: Reminder to use tool blocks instead of native functions
+  - Claude/Codex/Ollama: Standard prompt
+
+- **Mistral Adapter** - Disabled native tools with `--enabled-tools none`
+  - Forces Mistral to use our text-based tool format
+  - Works with permission system (inconsistent but functional)
+
+### Added
+- **Ctrl+S Expand/Collapse** - Toggle expanded tool activity view
+  - Normal: 6 calls, 3 lines per result
+  - Expanded: 20 calls, 15 lines per result
+  - Dynamic hint text "(ctrl+s to expand/collapse)"
+
+### Fixed
+- **Tool Call ID Collision** - Each tool call now has unique ID
+  - Was: `call_0, call_1` repeating each iteration (caused result mixing)
+  - Now: `call_<timestamp>_<random>` (globally unique)
+- **Permission Prompt Responsiveness** - Fixed lag on Enter
+  - Capture decision value before setImmediate defers execution
+  - Use ref to avoid stale closure issues
+- **Tool History on Errors** - Tool activity now saved even when response fails
+- **Pattern Display in Permission Prompt** - Glob patterns now show correctly
+  - Was: Empty path for glob/grep tools
+  - Now: Shows pattern like `**/*.md`
+- Tool-specific titles in permission prompt (Search files, Search content, etc.)
+
+---
+
 ## [0.2.83] - 2025-12-13
 
 ### Changed
@@ -28,6 +61,11 @@ All notable changes to PuzldAI will be documented in this file.
   - Works with Claude, Gemini, and other LLMs' naming conventions
 
 ### Added
+- **Agent Status Line** - Live execution status like Claude Code
+  - `src/tui/components/AgentStatus.tsx` - Status component
+  - Shows agent name, live elapsed timer, token count
+  - "esc to interrupt" hint during execution
+
 - **Tool History Persistence** - Tool activity persists in message history
   - `toolCalls` field added to Message interface
   - Tool calls saved with response message for history display

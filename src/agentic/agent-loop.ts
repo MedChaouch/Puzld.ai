@@ -65,6 +65,113 @@ export interface AgentLoopResult {
 }
 
 /**
+ * Build system prompt based on adapter type
+ */
+function buildSystemPrompt(adapterName: string, projectFiles: string, toolDescriptions: string): string {
+  // Base instructions shared by all adapters
+  const baseInstructions = `# Project Structure
+
+Here are the files in the current project (file names only - use tools to read contents):
+
+${projectFiles}
+
+# Available Tools
+
+${toolDescriptions}`;
+
+  // Adapter-specific prompts
+  if (adapterName === 'mistral') {
+    // Mistral needs very explicit instructions about text-based tool invocation
+    return `You are a coding assistant. You invoke tools by OUTPUTTING special code blocks.
+
+IMPORTANT: You do NOT have native/built-in tool access. Tools are invoked by writing \`\`\`tool code blocks in your response. The system parses your text output and executes tools for you.
+
+${baseInstructions}
+
+# How to Invoke Tools
+
+Write a code block with the "tool" language tag:
+
+\`\`\`tool
+{"name": "view", "arguments": {"path": "README.md"}}
+\`\`\`
+
+The system reads your text, finds \`\`\`tool blocks, executes them, and returns results.
+
+RULES:
+1. OUTPUT the \`\`\`tool block as text - do not try to call functions
+2. You cannot see file contents until you OUTPUT a view tool block
+3. One tool per \`\`\`tool block, multiple blocks allowed
+4. After outputting tool blocks, wait for results before continuing
+
+Example - to read a file, OUTPUT this text:
+\`\`\`tool
+{"name": "view", "arguments": {"path": "package.json"}}
+\`\`\``;
+  }
+
+  if (adapterName === 'gemini') {
+    // Gemini may have native context - remind it to use our tools
+    return `You are a coding assistant with access to tools via code blocks.
+
+${baseInstructions}
+
+# How to Use Tools
+
+Output a \`\`\`tool code block:
+
+\`\`\`tool
+{
+  "name": "tool_name",
+  "arguments": {"param": "value"}
+}
+\`\`\`
+
+IMPORTANT:
+- Use \`\`\`tool blocks to invoke tools (not native functions)
+- You must use 'view' tool to read file contents
+- Do not assume or hallucinate file contents
+- Multiple tools = multiple \`\`\`tool blocks`;
+  }
+
+  // Default prompt for Claude, Codex, Ollama
+  return `You are a helpful coding assistant with access to tools. You can explore the codebase and make changes.
+
+IMPORTANT: You MUST use tools to read files. You CANNOT see file contents without using the 'view' tool. Do NOT pretend or hallucinate file contents.
+
+${baseInstructions}
+
+# How to Use Tools
+
+To use a tool, respond with a JSON block in this format:
+
+\`\`\`tool
+{
+  "name": "tool_name",
+  "arguments": {
+    "param1": "value1"
+  }
+}
+\`\`\`
+
+CRITICAL:
+- Use \`\`\`tool (not \`\`\`json or other formats)
+- You CANNOT read files without using the 'view' tool
+- Do NOT make up or assume file contents
+
+You can call multiple tools by including multiple \`\`\`tool blocks.
+
+# Guidelines
+
+- Use 'glob' to find files by pattern (e.g., "**/*.ts")
+- Use 'grep' to search file contents for patterns
+- Use 'view' to read file contents
+- Use 'edit' for targeted changes to existing files
+- Use 'write' for new files or complete rewrites
+- Use 'bash' for running commands`;
+}
+
+/**
  * Run an agent loop with tool access
  *
  * The agent can call tools to explore the codebase, then respond.
@@ -95,56 +202,8 @@ export async function runAgentLoop(
     return `## ${t.name}\n${t.description}\n\nParameters:\n${params}\nRequired: ${required}`;
   }).join('\n\n---\n\n');
 
-  const systemPrompt = `You are a helpful coding assistant with access to tools. You can explore the codebase and make changes.
-
-IMPORTANT: You MUST use tools to read files. You CANNOT see file contents without using the 'view' tool. Do NOT pretend or hallucinate file contents.
-
-# Project Structure
-
-Here are the files in the current project (use 'view' tool to read their contents):
-
-${projectFiles}
-
-# Available Tools
-
-${toolDescriptions}
-
-# How to Use Tools
-
-To use a tool, you MUST respond with a JSON block in this EXACT format:
-
-\`\`\`tool
-{
-  "name": "tool_name",
-  "arguments": {
-    "param1": "value1"
-  }
-}
-\`\`\`
-
-CRITICAL:
-- You MUST use \`\`\`tool (not \`\`\`json or any other format)
-- You CANNOT read files without using the 'view' tool
-- You CANNOT search files without using 'glob' or 'grep' tools
-- Do NOT say "I read the file" unless you actually used the view tool
-- Do NOT make up or assume file contents
-
-You can call multiple tools by including multiple \`\`\`tool blocks.
-
-After using tools, you'll receive the results and can continue exploring or provide your final response.
-
-When you're done and ready to give your final answer, just respond normally without any tool blocks.
-
-# Guidelines
-
-- Use 'glob' to find files by pattern (e.g., "**/*.ts")
-- Use 'grep' to search file contents for patterns
-- Use 'view' to read file contents - YOU MUST DO THIS before claiming to know what's in a file
-- Use 'edit' for targeted changes to existing files
-- Use 'write' for new files or complete rewrites
-- Use 'bash' for running commands (build, test, git, etc.)
-- Always explore using tools before answering questions about the codebase
-- Never claim to have read a file if you haven't used the view tool`;
+  // Build adapter-specific system prompt
+  const systemPrompt = buildSystemPrompt(adapter.name, projectFiles, toolDescriptions);
 
   // Initial message
   messages.push({ role: 'user', content: userMessage });
@@ -308,7 +367,6 @@ function parseToolCalls(content: string): ToolCall[] {
   const toolBlockRegex = /```tool\s*([\s\S]*?)```/g;
 
   let match;
-  let callId = 0;
 
   while ((match = toolBlockRegex.exec(content)) !== null) {
     try {
@@ -316,8 +374,10 @@ function parseToolCalls(content: string): ToolCall[] {
       const parsed = JSON.parse(json);
 
       if (parsed.name && typeof parsed.name === 'string') {
+        // Use unique ID to avoid collisions across iterations
+        const uniqueId = `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         calls.push({
-          id: `call_${callId++}`,
+          id: uniqueId,
           name: parsed.name,
           arguments: parsed.arguments || {},
         });
@@ -341,8 +401,9 @@ async function checkAndRequestPermission(
   // Normalize tool name (handle aliases like read_file -> view)
   const toolName = normalizeToolName(call.name);
 
-  // Handle different argument names (file_path -> path, etc.)
-  const path = (call.arguments.path || call.arguments.file_path || call.arguments.file) as string | undefined;
+  // Handle different argument names (file_path -> path, pattern for glob/grep, etc.)
+  const filePath = (call.arguments.path || call.arguments.file_path || call.arguments.file) as string | undefined;
+  const pattern = call.arguments.pattern as string | undefined;
   const command = (call.arguments.command || call.arguments.cmd) as string | undefined;
 
   // Determine action type using normalized name
@@ -358,8 +419,20 @@ async function checkAndRequestPermission(
     return { decision: 'allow' };
   }
 
+  // Build full path (for file operations) or use pattern (for glob/grep)
+  let fullPath: string | undefined;
+  let displayTarget: string | undefined;
+
+  if (filePath) {
+    fullPath = filePath.startsWith('/') ? filePath : `${cwd}/${filePath}`;
+    displayTarget = fullPath;
+  } else if (pattern) {
+    // For glob/grep, use cwd as the base path for auto-approval
+    fullPath = cwd;
+    displayTarget = pattern;
+  }
+
   // Check if already auto-approved
-  const fullPath = path ? (path.startsWith('/') ? path : `${cwd}/${path}`) : undefined;
   if (permissionTracker.isAutoApproved(action, fullPath)) {
     return { decision: 'allow' };
   }
@@ -373,7 +446,7 @@ async function checkAndRequestPermission(
   const request: PermissionRequest = {
     action,
     tool: toolName,
-    path: fullPath,
+    path: displayTarget,
     command,
     description: getPermissionDescription(toolName, call.arguments),
   };

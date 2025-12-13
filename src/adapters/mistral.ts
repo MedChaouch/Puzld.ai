@@ -21,17 +21,21 @@ export const mistralAdapter: Adapter = {
     const config = getConfig();
     const startTime = Date.now();
     const model = options?.model ?? config.adapters.mistral?.model;
-    // Note: vibe doesn't have a --no-tools flag. In agentic mode, we rely on
-    // the JSON prompt format to discourage tool use. Keep --auto-approve to
-    // prevent hanging if vibe does try to use tools.
-    const _disableTools = options?.disableTools ?? true;
+    const disableTools = options?.disableTools ?? true; // Default: disable native tools
 
     try {
       // vibe -p "prompt" for programmatic mode
       // --output streaming for fastest response (newline-delimited JSON)
-      // --auto-approve to skip tool confirmations (needed even in agentic mode)
       // Note: vibe doesn't have a CLI flag for model selection - it uses active_model in config
-      const args = ['-p', prompt, '--output', 'streaming', '--auto-approve'];
+      const args = ['-p', prompt, '--output', 'streaming'];
+
+      // Disable native tools for agentic mode (LLM uses our tool system instead)
+      // --enabled-tools with non-existent tool disables all tools in -p mode
+      if (disableTools) {
+        args.push('--enabled-tools', 'none');
+      } else {
+        args.push('--auto-approve'); // Only auto-approve if tools are enabled
+      }
 
       const { stdout, stderr } = await execa(
         config.adapters.mistral?.path || 'vibe',

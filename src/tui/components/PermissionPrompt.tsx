@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import type { PermissionRequest, PermissionDecision } from '../../agentic/tools/permissions';
 import path from 'path';
@@ -9,23 +9,49 @@ interface PermissionPromptProps {
 }
 
 const ACTION_TITLES: Record<string, string> = {
-  read: 'Read file',
-  write: 'Write file',
+  read: 'Read',
+  write: 'Write',
   execute: 'Run command',
+};
+
+// More specific titles based on tool
+const TOOL_TITLES: Record<string, string> = {
+  view: 'Read file',
+  glob: 'Search files',
+  grep: 'Search content',
+  write: 'Write file',
+  edit: 'Edit file',
+  bash: 'Run command',
 };
 
 export function PermissionPrompt({ request, onDecision }: PermissionPromptProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const selectedIndexRef = useRef(selectedIndex);
 
-  // Get directory name for "allow all in directory" option
-  const dirName = request.path ? path.basename(path.dirname(request.path)) + '/' : '';
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedIndexRef.current = selectedIndex;
+  }, [selectedIndex]);
 
+  // Check if this is a glob pattern (contains * or ?) vs a file path
+  const isPattern = request.path && (request.path.includes('*') || request.path.includes('?'));
+
+  // Get directory name for "allow all in directory" option (only for file paths)
+  const dirName = request.path && !isPattern ? path.basename(path.dirname(request.path)) + '/' : '';
+
+  // Build options - skip "allow in directory" for patterns since it doesn't make sense
   const options: Array<{ label: string; decision: PermissionDecision }> = [
     { label: 'Yes', decision: 'allow' },
-    { label: `Yes, allow ${request.action}ing from ${dirName} during this session`, decision: 'allow_dir' },
+  ];
+
+  if (dirName) {
+    options.push({ label: `Yes, allow ${request.action}ing from ${dirName} during this session`, decision: 'allow_dir' });
+  }
+
+  options.push(
     { label: `Yes, allow all ${request.action}s during this session`, decision: 'allow_all' },
     { label: 'No', decision: 'deny' },
-  ];
+  );
 
   useInput((input, key) => {
     if (key.upArrow) {
@@ -33,13 +59,17 @@ export function PermissionPrompt({ request, onDecision }: PermissionPromptProps)
     } else if (key.downArrow) {
       setSelectedIndex(i => Math.min(options.length - 1, i + 1));
     } else if (key.return) {
-      onDecision(options[selectedIndex].decision);
+      // Capture decision NOW, before setImmediate defers execution
+      const idx = selectedIndexRef.current;
+      const decision = options[idx]?.decision ?? 'allow';
+      setImmediate(() => onDecision(decision));
     } else if (key.escape) {
-      onDecision('cancel');
+      setImmediate(() => onDecision('cancel'));
     }
   });
 
-  const title = ACTION_TITLES[request.action] || 'Permission required';
+  // Use tool-specific title if available, fall back to action-based title
+  const title = TOOL_TITLES[request.tool] || ACTION_TITLES[request.action] || 'Permission required';
   const target = request.path || request.command || '';
 
   return (

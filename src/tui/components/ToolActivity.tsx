@@ -12,6 +12,7 @@ export interface ToolCallInfo {
 interface ToolActivityProps {
   calls: ToolCallInfo[];
   iteration: number;
+  expanded?: boolean;
 }
 
 // Format tool display name and target
@@ -58,11 +59,14 @@ function formatResult(result: string, maxLines: number = 3): { lines: string[]; 
   return { lines, truncated };
 }
 
-export function ToolActivity({ calls, iteration }: ToolActivityProps) {
+export function ToolActivity({ calls, iteration, expanded = false }: ToolActivityProps) {
   if (calls.length === 0) return null;
 
-  // Show last 6 calls
-  const recentCalls = calls.slice(-6);
+  // Show more calls when expanded
+  const maxCalls = expanded ? 20 : 6;
+  const maxLines = expanded ? 15 : 3;
+  const maxLineLength = expanded ? 120 : 60;
+  const recentCalls = calls.slice(-maxCalls);
 
   return (
     <Box flexDirection="column" marginY={1}>
@@ -73,8 +77,9 @@ export function ToolActivity({ calls, iteration }: ToolActivityProps) {
                            call.status === 'running' ? 'yellow' : 'gray';
         const nameColor = call.status === 'error' ? 'red' : 'white';
 
-        // Truncate target for display
-        const displayTarget = target.length > 50 ? target.slice(0, 47) + '...' : target;
+        // Truncate target for display (longer when expanded)
+        const maxTargetLen = expanded ? 100 : 50;
+        const displayTarget = target.length > maxTargetLen ? target.slice(0, maxTargetLen - 3) + '...' : target;
 
         return (
           <Box key={call.id} flexDirection="column">
@@ -91,20 +96,20 @@ export function ToolActivity({ calls, iteration }: ToolActivityProps) {
             {call.status === 'done' && call.result && (
               <Box flexDirection="column" marginLeft={2}>
                 {(() => {
-                  const { lines, truncated } = formatResult(call.result, 3);
+                  const { lines, truncated } = formatResult(call.result, maxLines);
                   return (
                     <>
                       {lines.map((line, i) => (
                         <Box key={i}>
                           <Text dimColor>{i === lines.length - 1 && !truncated ? '└ ' : '│ '}</Text>
-                          <Text dimColor>{line.slice(0, 60)}{line.length > 60 ? '...' : ''}</Text>
+                          <Text dimColor>{line.slice(0, maxLineLength)}{line.length > maxLineLength ? '...' : ''}</Text>
                         </Box>
                       ))}
                       {truncated && (
                         <Box>
                           <Text dimColor>└ </Text>
-                          <Text dimColor>... +{call.result.split('\n').length - 3} lines </Text>
-                          <Text color="gray">(ctrl+s to expand)</Text>
+                          <Text dimColor>... +{call.result.split('\n').length - maxLines} lines </Text>
+                          <Text color="gray">(ctrl+s to {expanded ? 'collapse' : 'expand'})</Text>
                         </Box>
                       )}
                     </>
@@ -117,16 +122,17 @@ export function ToolActivity({ calls, iteration }: ToolActivityProps) {
             {call.status === 'error' && call.result && (
               <Box marginLeft={2}>
                 <Text dimColor>└ </Text>
-                <Text color="red">{call.result.slice(0, 60)}</Text>
+                <Text color="red">{call.result.slice(0, maxLineLength)}</Text>
               </Box>
             )}
           </Box>
         );
       })}
 
-      {calls.length > 6 && (
+      {calls.length > maxCalls && (
         <Box marginLeft={2}>
-          <Text dimColor>... and {calls.length - 6} more</Text>
+          <Text dimColor>... and {calls.length - maxCalls} more </Text>
+          <Text color="gray">(ctrl+s to {expanded ? 'collapse' : 'expand'})</Text>
         </Box>
       )}
     </Box>
