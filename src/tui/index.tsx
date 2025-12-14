@@ -50,6 +50,7 @@ import { checkForUpdate, markUpdated } from '../lib/updateCheck';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { AgentPanel } from './components/AgentPanel';
 import { IndexPanel } from './components/IndexPanel';
+import { ObservePanel } from './components/ObservePanel';
 import { DiffReview } from './components/DiffReview';
 import { execa } from 'execa';
 import type { PlanStep, StepResult } from '../executor';
@@ -75,7 +76,11 @@ import {
   startObservation,
   logResponse,
   logReviewDecision,
-  completeObservation
+  completeObservation,
+  getExportSummary,
+  getRecentObservations,
+  exportObservations,
+  exportPreferencePairs
 } from '../observation';
 import { addMemory } from '../memory/vector-store';
 import { buildInjectionForAgent } from '../memory/injector';
@@ -114,7 +119,7 @@ interface Message {
 let messageId = 0;
 const nextId = () => String(++messageId);
 
-type AppMode = 'chat' | 'workflows' | 'sessions' | 'settings' | 'model' | 'compare' | 'collaboration' | 'agent' | 'review' | 'index' | 'plan';
+type AppMode = 'chat' | 'workflows' | 'sessions' | 'settings' | 'model' | 'compare' | 'collaboration' | 'agent' | 'review' | 'index' | 'observe' | 'plan';
 type AgenticSubMode = 'plan' | 'build';
 
 interface CompareResult {
@@ -1009,7 +1014,20 @@ Keep your response concise and focused on the plan, not the implementation.`;
       return;
     }
 
+    // Capture session ID to avoid stale reference
+    const sessionId = session?.id;
+
     setMessages(prev => [...prev, { id: nextId(), role: 'user', content: userMessage }]);
+
+    // Save user message to session
+    if (sessionId) {
+      const currentSession = loadUnifiedSession(sessionId);
+      if (currentSession) {
+        const updated = await addMessageCompat(currentSession, 'user', userMessage, agentName);
+        setSession(updated);
+      }
+    }
+
     setLoading(true);
     setLoadingAgent(agentName);
     setLoadingStartTime(Date.now());
@@ -1119,13 +1137,23 @@ Keep your response concise and focused on the plan, not the implementation.`;
               `  ${e.operation}: ${e.filePath}${e.originalContent === null ? ' (new)' : ''}`
             ).join('\n');
 
+            const reviewContent = `${parsed.explanation || ''}\n\nProposed ${edits.length} file edit(s):\n${editSummary}\n\nReview below:`;
             setMessages(prev => [...prev, {
               id: nextId(),
               role: 'assistant',
-              content: `${parsed.explanation || ''}\n\nProposed ${edits.length} file edit(s):\n${editSummary}\n\nReview below:`,
+              content: reviewContent,
               agent: agentName,
               duration
             }]);
+
+            // Save to session
+            if (sessionId) {
+              const currentSession = loadUnifiedSession(sessionId);
+              if (currentSession) {
+                const updated = await addMessageCompat(currentSession, 'assistant', reviewContent, agentName);
+                setSession(updated);
+              }
+            }
 
             setProposedEdits(edits);
             setMode('review');
@@ -1147,6 +1175,15 @@ Keep your response concise and focused on the plan, not the implementation.`;
         toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined
       }]);
 
+      // Save assistant response to session
+      if (sessionId) {
+        const currentSession = loadUnifiedSession(sessionId);
+        if (currentSession) {
+          const updated = await addMessageCompat(currentSession, 'assistant', content, agentName);
+          setSession(updated);
+        }
+      }
+
       if (result.tokens) {
         setTokens(prev => prev + (result.tokens?.input || 0) + (result.tokens?.output || 0));
       }
@@ -1156,13 +1193,23 @@ Keep your response concise and focused on the plan, not the implementation.`;
     } catch (err) {
       // Save error message with tool calls so history is preserved (use ref to avoid stale closure)
       const currentToolCalls = [...toolActivityRef.current];
+      const errorMsg = 'Error: ' + (err as Error).message;
       setMessages(prev => [...prev, {
         id: nextId(),
         role: 'assistant',
-        content: 'Error: ' + (err as Error).message,
+        content: errorMsg,
         agent: agentName,
         toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined
       }]);
+
+      // Save error to session
+      if (sessionId) {
+        const currentSession = loadUnifiedSession(sessionId);
+        if (currentSession) {
+          const updated = await addMessageCompat(currentSession, 'assistant', errorMsg, agentName);
+          setSession(updated);
+        }
+      }
     }
     setLoading(false);
     setLoadingStartTime(undefined);
@@ -1318,6 +1365,11 @@ Commands:
   /index context <task>     - Get relevant code for task
   /index config             - Show project configuration
   /index graph              - Show dependency graph
+  /observe                  - Training observations panel
+  /observe summary          - Show observation statistics
+  /observe list             - List recent observations
+  /observe export [path]    - Export observations to file
+  /observe preferences      - Export DPO preference pairs
   /session                  - Start new session
   /resume                   - Resume a previous session
 
@@ -1477,6 +1529,97 @@ Compare View:
           setLoading(false);
         } else {
           addMessage('Unknown subcommand: ' + subCmd + '\n\nUsage: /index [full|quick|search|context|config|graph]', 'system');
+        }
+        break;
+      }
+
+      case 'observe': {
+        // Training observations
+        const subCmd = rest.trim().split(/\s+/)[0] || '';
+        const subArg = rest.slice(subCmd.length).trim();
+
+        if (!subCmd) {
+          // Open observe panel
+          setMode('observe');
+          break;
+        }
+
+        if (subCmd === 'summary') {
+          // Show observation summary
+          try {
+            const summary = getExportSummary({ agent: subArg || undefined });
+            let msg = subArg ? `Observations (${subArg}):\n` : 'All Observations:\n';
+            msg += '─'.repeat(40) + '\n';
+            msg += `Total observations: ${summary.observations}\n`;
+            msg += `Preference pairs: ${summary.preferencePairs}`;
+            if (Object.keys(summary.bySignalType).length > 0) {
+              msg += '\n\nBy signal type:';
+              for (const [type, count] of Object.entries(summary.bySignalType)) {
+                msg += `\n  ${type}: ${count}`;
+              }
+            }
+            addMessage(msg, 'system');
+          } catch (err) {
+            addMessage('Summary error: ' + (err as Error).message, 'system');
+          }
+        } else if (subCmd === 'list') {
+          // List recent observations
+          try {
+            const limit = parseInt(subArg) || 10;
+            const observations = getRecentObservations({ limit });
+            if (observations.length === 0) {
+              addMessage('No observations found.', 'system');
+            } else {
+              let msg = 'Recent Observations:\n' + '─'.repeat(40) + '\n';
+              observations.forEach((obs, i) => {
+                const date = new Date(obs.timestamp).toLocaleString();
+                const prompt = obs.prompt?.slice(0, 60) || '(no prompt)';
+                msg += `${i + 1}. [${date}] ${obs.agent}/${obs.model}\n`;
+                msg += `   ${obs.tokensIn || 0} in / ${obs.tokensOut || 0} out | ${obs.durationMs || 0}ms\n`;
+                msg += `   ${prompt}${obs.prompt && obs.prompt.length > 60 ? '...' : ''}\n\n`;
+              });
+              addMessage(msg.trim(), 'system');
+            }
+          } catch (err) {
+            addMessage('List error: ' + (err as Error).message, 'system');
+          }
+        } else if (subCmd === 'export') {
+          // Export observations to file
+          const outputPath = subArg || 'observations.jsonl';
+          try {
+            const result = exportObservations({
+              outputPath,
+              format: outputPath.endsWith('.json') ? 'json' : outputPath.endsWith('.csv') ? 'csv' : 'jsonl',
+              limit: 10000,
+              includeContent: true
+            });
+            if (result.success) {
+              addMessage(`Exported ${result.count} observations to ${result.path}`, 'system');
+            } else {
+              addMessage(`Export failed: ${result.error}`, 'system');
+            }
+          } catch (err) {
+            addMessage('Export error: ' + (err as Error).message, 'system');
+          }
+        } else if (subCmd === 'preferences') {
+          // Export preference pairs for DPO training
+          const outputPath = subArg || 'preferences.jsonl';
+          try {
+            const result = exportPreferencePairs({
+              outputPath,
+              format: outputPath.endsWith('.json') ? 'json' : 'jsonl',
+              limit: 10000
+            });
+            if (result.success) {
+              addMessage(`Exported ${result.count} preference pairs to ${result.path}`, 'system');
+            } else {
+              addMessage(`Export failed: ${result.error}`, 'system');
+            }
+          } catch (err) {
+            addMessage('Export error: ' + (err as Error).message, 'system');
+          }
+        } else {
+          addMessage('Unknown subcommand: ' + subCmd + '\n\nUsage: /observe [summary|list|export|preferences]', 'system');
         }
         break;
       }
@@ -2464,6 +2607,91 @@ Compare View:
                 }
                 setLoading(false);
               }, 50);
+            }
+          }}
+          onBack={() => setMode('chat')}
+        />
+      )}
+
+      {/* Observe Mode */}
+      {mode === 'observe' && (
+        <ObservePanel
+          onSelect={(option) => {
+            setMode('chat');
+            if (option === 'summary') {
+              // Show summary immediately
+              setMessages(prev => [...prev, { id: nextId(), role: 'user', content: '/observe summary' }]);
+              try {
+                const summary = getExportSummary({});
+                let msg = 'All Observations:\n' + '─'.repeat(40) + '\n';
+                msg += `Total observations: ${summary.observations}\n`;
+                msg += `Preference pairs: ${summary.preferencePairs}`;
+                if (Object.keys(summary.bySignalType).length > 0) {
+                  msg += '\n\nBy signal type:';
+                  for (const [type, count] of Object.entries(summary.bySignalType)) {
+                    msg += `\n  ${type}: ${count}`;
+                  }
+                }
+                setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: msg, agent: 'system' }]);
+              } catch (err) {
+                setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'Summary error: ' + (err as Error).message, agent: 'system' }]);
+              }
+            } else if (option === 'list') {
+              // Show recent observations
+              setMessages(prev => [...prev, { id: nextId(), role: 'user', content: '/observe list' }]);
+              try {
+                const observations = getRecentObservations({ limit: 10 });
+                if (observations.length === 0) {
+                  setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'No observations found.', agent: 'system' }]);
+                } else {
+                  let msg = 'Recent Observations:\n' + '─'.repeat(40) + '\n';
+                  observations.forEach((obs, i) => {
+                    const date = new Date(obs.timestamp).toLocaleString();
+                    const prompt = obs.prompt?.slice(0, 60) || '(no prompt)';
+                    msg += `${i + 1}. [${date}] ${obs.agent}/${obs.model}\n`;
+                    msg += `   ${obs.tokensIn || 0} in / ${obs.tokensOut || 0} out | ${obs.durationMs || 0}ms\n`;
+                    msg += `   ${prompt}${obs.prompt && obs.prompt.length > 60 ? '...' : ''}\n\n`;
+                  });
+                  setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: msg.trim(), agent: 'system' }]);
+                }
+              } catch (err) {
+                setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'List error: ' + (err as Error).message, agent: 'system' }]);
+              }
+            } else if (option === 'export') {
+              // Export to file
+              setMessages(prev => [...prev, { id: nextId(), role: 'user', content: '/observe export' }]);
+              try {
+                const result = exportObservations({
+                  outputPath: 'observations.jsonl',
+                  format: 'jsonl',
+                  limit: 10000,
+                  includeContent: true
+                });
+                if (result.success) {
+                  setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: `Exported ${result.count} observations to ${result.path}`, agent: 'system' }]);
+                } else {
+                  setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: `Export failed: ${result.error}`, agent: 'system' }]);
+                }
+              } catch (err) {
+                setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'Export error: ' + (err as Error).message, agent: 'system' }]);
+              }
+            } else if (option === 'preferences') {
+              // Export preference pairs
+              setMessages(prev => [...prev, { id: nextId(), role: 'user', content: '/observe preferences' }]);
+              try {
+                const result = exportPreferencePairs({
+                  outputPath: 'preferences.jsonl',
+                  format: 'jsonl',
+                  limit: 10000
+                });
+                if (result.success) {
+                  setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: `Exported ${result.count} preference pairs to ${result.path}`, agent: 'system' }]);
+                } else {
+                  setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: `Export failed: ${result.error}`, agent: 'system' }]);
+                }
+              } catch (err) {
+                setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: 'Export error: ' + (err as Error).message, agent: 'system' }]);
+              }
             }
           }}
           onBack={() => setMode('chat')}

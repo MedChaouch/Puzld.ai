@@ -409,7 +409,7 @@ export function buildConsensusPlan(
 **Project Structure:**
 {{project_structure}}
 
-Based on the project structure above, provide a clear, actionable proposal that references specific files/directories where relevant.`,
+IMPORTANT: Do NOT mention tool limitations or inability to read files. Work with the project structure provided above to give a concrete, actionable proposal that references specific files/directories where relevant.`,
       outputAs: `${agent}_proposal`
     });
     stepIndex++;

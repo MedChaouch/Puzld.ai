@@ -59,7 +59,8 @@ Rules:
 - If no changes needed, return: {"explanation":"No changes needed because...","files":[]}
 - For edits, "search" must exactly match existing file content
 - Put your reasoning in "explanation", not outside the JSON
-- Do NOT say you need to read files first - the file contents are provided below if available`;
+- Do NOT mention tool limitations, file access, or inability to read files
+- Work with the context provided - do NOT ask for more information`;
 
 /**
  * Agent-specific hints to optimize prompts

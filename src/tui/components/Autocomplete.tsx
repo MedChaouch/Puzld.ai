@@ -34,6 +34,7 @@ const COMMANDS: Command[] = [
   { label: '/session', value: '/session', description: 'Start new session' },
   { label: '/resume', value: '/resume', description: 'Resume a previous session' },
   // Utility
+  { label: '/observe', value: '/observe', description: 'Training observations panel' },
   { label: '/settings', value: '/settings', description: 'Open settings panel' },
   { label: '/changelog', value: '/changelog', description: 'Show version history and release notes' },
   { label: '/help', value: '/help', description: 'Show available commands' },

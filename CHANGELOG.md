@@ -6,6 +6,32 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.87] - 2025-12-14
+
+### Added
+- **`/observe` TUI Panel** - Training observations now accessible in TUI
+  - `/observe` opens panel with Summary, List, Export, Preferences options
+  - `/observe summary [agent]` - Show observation statistics
+  - `/observe list [limit]` - List recent observations
+  - `/observe export [path]` - Export to JSONL/JSON/CSV
+  - `/observe preferences [path]` - Export DPO preference pairs
+  - `ObservePanel` component with arrow key navigation
+
+### Fixed
+- **Session Persistence** - Messages now saved to database in intelligent routing
+  - User messages saved before agent loop runs
+  - Assistant responses saved after completion
+  - Error messages saved on failure
+  - Review mode responses saved when entering diff review
+  - `/resume` now works correctly to continue previous sessions
+
+- **"I don't have access to tools" Messages** - LLMs no longer mention limitations
+  - Consensus proposals prompt updated with explicit instruction
+  - Build mode (JSON) prompt updated to work with provided context
+  - Applies to Claude and other models that were being overly cautious
+
+---
+
 ## [0.2.86] - 2025-12-14
 
 ### Added
