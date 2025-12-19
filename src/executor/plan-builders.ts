@@ -59,7 +59,7 @@ export function buildComparePlan(
   prompt: string,
   options: CompareOptions
 ): ExecutionPlan {
-  const { agents, sequential = false, pick = false, projectStructure } = options;
+  const { agents, models, sequential = false, pick = false, projectStructure } = options;
 
   // Build context with project structure if provided
   const context: Record<string, unknown> = {};
@@ -70,6 +70,7 @@ export function buildComparePlan(
   const steps: PlanStep[] = agents.map((agent, i) => ({
     id: generateStepId(i),
     agent,
+    model: models?.[i],  // Map model by index if provided
     action: 'prompt' as const,
     prompt: projectStructure
       ? `**Task:** {{prompt}}

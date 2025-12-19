@@ -37,6 +37,11 @@ import {
   observeListCommand,
   observeExportCommand
 } from './commands/observe';
+import {
+  loginCommand,
+  logoutCommand,
+  whoamiCommand
+} from './commands/login';
 import { startTUI } from '../tui';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -88,16 +93,22 @@ program
 
 program
   .command('serve')
-  .description('Start the API server')
+  .description('Start the API server or MCP bridge')
   .option('-p, --port <port>', 'Port to listen on', '3000')
   .option('-H, --host <host>', 'Host to bind to', '0.0.0.0')
   .option('-w, --web', 'Also start ttyd web terminal')
   .option('-t, --terminal-port <port>', 'Terminal port (default: 3001)')
+  .option('--mcp', 'Start MCP bridge server instead of API server')
+  .option('--mcp-port <port>', 'MCP bridge port (default: 9234)')
+  .option('--local', 'Force local HTTP bridge (no cloud WebSocket)')
   .action((opts) => serveCommand({
     port: parseInt(opts.port, 10),
     host: opts.host,
     web: opts.web,
-    terminalPort: opts.terminalPort ? parseInt(opts.terminalPort, 10) : undefined
+    terminalPort: opts.terminalPort ? parseInt(opts.terminalPort, 10) : undefined,
+    mcp: opts.mcp,
+    mcpPort: opts.mcpPort ? parseInt(opts.mcpPort, 10) : undefined,
+    local: opts.local
   }));
 
 program
@@ -259,6 +270,27 @@ observeCmd
     type: opts.type as 'observations' | 'preferences',
     noContent: !opts.content
   }));
+
+// MCP Authentication commands
+program
+  .command('login')
+  .description('Login to PuzldAI MCP server')
+  .option('-t, --token <token>', 'API token (or enter interactively)')
+  .option('-e, --endpoint <url>', 'MCP server endpoint')
+  .action((opts) => loginCommand({
+    token: opts.token,
+    endpoint: opts.endpoint
+  }));
+
+program
+  .command('logout')
+  .description('Logout from PuzldAI MCP server')
+  .action(logoutCommand);
+
+program
+  .command('whoami')
+  .description('Show current login status')
+  .action(whoamiCommand);
 
 // Multi-agent collaboration commands
 program

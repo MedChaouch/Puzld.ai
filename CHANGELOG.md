@@ -6,6 +6,64 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.92] - 2025-12-19
+
+### Added
+- **MCP Cloud Integration** - Connect to Puzld MCP server via WebSocket
+  - `puzld serve --mcp` - Start local Core and connect to cloud MCP
+  - `puzld login` - Authenticate with Puzld MCP (opens browser OAuth)
+  - Outbound WebSocket connection (solves localhost unreachable problem)
+
+- **MCP Compare Mode** - Run prompts through multiple agents via MCP
+  - `compare_agents` MCP tool for Claude Code and other MCP clients
+  - `models` array parameter - specify model per agent by index
+  - `includeProjectContext` option - inject file structure as context
+  - Separate responses per agent (not merged)
+
+- **Model Management via MCP**
+  - `list_agents` now shows configured models per agent
+  - `list_agents` now shows available models per agent (from KNOWN_MODELS)
+  - Dynamic ollama model detection via `ollama list`
+
+### Changed
+- Compare mode output now returns separate responses per agent (was incorrectly returning only last response)
+
+### Fixed
+- Compare mode `getFinalOutput()` now returns undefined for compare mode without pick
+- Gemini adapter debug logging (conditional on `logLevel: 'debug'`)
+
+---
+
+## [0.2.91] - 2025-12-16
+
+### Added
+- **Gemini Safe Mode** - Native Gemini file editing with approval system
+  - `gemini-safe.ts` adapter with file backup/rollback
+  - Integrates Gemini CLI v0.21.0 native write capabilities
+  - `geminiApprovalMode` option (`--yolo`, `--approval-mode auto_edit`)
+
+- **Codex Safe Mode** - Native Codex file editing with approval system
+  - `codex-safe.ts` adapter with file backup/rollback
+  - File comparison (before/after) to detect changes
+  - DiffReview for approval before applying changes
+
+- **Tool Name Normalization** - Better LLM compatibility
+  - Strip prefixes (`default_api:`, `functions.`) for Gemini
+  - Extended tool aliases for more LLM naming patterns
+  - Argument normalization (`file_path→path`, `old_text→search`, etc.)
+
+### Fixed
+- **DiffReview** - Fixed `proposedContent` vs `newContent` mismatch (missing additions)
+- **"Yes to all"** - Now only applies to current batch, not entire session
+- Duplicate edit prevention (LLMs sometimes repeat tool calls)
+
+### Changed
+- System prompts improved for casual conversation handling
+- Stronger guidance for edit tool (view before edit)
+- Anti-sed/awk instructions to prefer edit tool
+
+---
+
 ## [0.2.90] - 2025-12-15
 
 ### Added

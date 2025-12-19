@@ -15,7 +15,7 @@ import { ApprovalModePanel, type ApprovalMode } from './components/ApprovalModeP
 import { isDirectoryTrusted, trustDirectory, getParentDirectory, getTrustedDirectories, untrustDirectory } from '../trust';
 import { useHistory } from './hooks/useHistory';
 import { getCommandSuggestions } from './components/Autocomplete';
-import { StatusBar } from './components/StatusBar';
+import { StatusBar, type McpStatus } from './components/StatusBar';
 import {
   buildComparePlan,
   buildPipelinePlan,
@@ -177,6 +177,7 @@ function App() {
   const [isTrusted, setIsTrusted] = useState<boolean | null>(null); // null = checking, true/false = result
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>('default');
   const [allowAllEdits, setAllowAllEdits] = useState(false); // Persists "allow all edits" across messages
+  const [mcpStatus, setMcpStatus] = useState<McpStatus>('local'); // MCP connection status
 
   // Tool activity state (for background display like Claude Code)
   const [toolActivity, setToolActivity] = useState<ToolCallInfo[]>([]);
@@ -504,6 +505,29 @@ function App() {
         setShowUpdatePrompt(true);
       }
     });
+  }, []);
+
+  // Check MCP status on startup
+  useEffect(() => {
+    const config = getConfig();
+    if (config.cloud?.token) {
+      // Has token - check if connected
+      setMcpStatus('checking');
+      const endpoint = config.cloud.endpoint || 'https://puzld-mcp.med-ch-mu.workers.dev';
+      fetch(`${endpoint}/auth/validate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.cloud.token}`
+        }
+      }).then(res => {
+        setMcpStatus(res.ok ? 'connected' : 'disconnected');
+      }).catch(() => {
+        setMcpStatus('disconnected');
+      });
+    } else {
+      setMcpStatus('local');
+    }
   }, []);
 
   // Handle update action
@@ -1711,6 +1735,11 @@ Trust:
   /trusted remove [path] - Remove trust
   /add-dir [path]      - Alias for /trusted add
 
+MCP Cloud:
+  /login <token>       - Login to MCP server
+  /logout              - Logout from MCP
+  /mcp                 - Show MCP connection status
+
 Utility:
   /settings  - Open settings panel
   /changelog - Show version history
@@ -2004,6 +2033,97 @@ Compare View:
       case 'exit':
         process.exit(0);
         break;
+
+      // === MCP COMMANDS ===
+      case 'login': {
+        // Login to MCP server
+        const token = rest.trim();
+        if (token) {
+          // Direct token login
+          const currentConfig = getConfig();
+          const fullConfig = { ...currentConfig };
+          fullConfig.cloud = {
+            ...fullConfig.cloud,
+            endpoint: fullConfig.cloud?.endpoint || 'https://puzld-mcp.med-ch-mu.workers.dev',
+            token
+          };
+          saveConfig(fullConfig);
+          setMcpStatus('checking');
+          addMessage('Token saved. Verifying...');
+
+          // Verify token
+          const endpoint = fullConfig.cloud.endpoint || 'https://puzld-mcp.med-ch-mu.workers.dev';
+          fetch(`${endpoint}/auth/validate`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          }).then(res => {
+            if (res.ok) {
+              setMcpStatus('connected');
+              addMessage('Logged in to MCP successfully.');
+            } else {
+              setMcpStatus('disconnected');
+              addMessage('Token saved but could not verify (MCP server may be offline).');
+            }
+          }).catch(() => {
+            setMcpStatus('disconnected');
+            addMessage('Token saved but MCP server is not reachable.');
+          });
+        } else {
+          addMessage('Usage: /login <token>\n\nOr use CLI: puzld login');
+        }
+        break;
+      }
+
+      case 'logout': {
+        const currentConfig = getConfig();
+        if (!currentConfig.cloud?.token) {
+          addMessage('Not logged in.');
+        } else {
+          const fullConfig = { ...currentConfig };
+          fullConfig.cloud = {
+            ...fullConfig.cloud,
+            token: undefined
+          };
+          saveConfig(fullConfig);
+          setMcpStatus('local');
+          addMessage('Logged out from MCP.');
+        }
+        break;
+      }
+
+      case 'mcp': {
+        const subCmd = rest.trim();
+        const currentConfig = getConfig();
+
+        if (!subCmd || subCmd === 'status') {
+          // Show MCP status
+          const endpoint = currentConfig.cloud?.endpoint || 'https://puzld-mcp.med-ch-mu.workers.dev';
+          const hasToken = !!currentConfig.cloud?.token;
+          const machineId = currentConfig.cloud?.machineId || '(not registered)';
+
+          let statusMsg = `MCP Status: ${mcpStatus}\n`;
+          statusMsg += `─`.repeat(30) + '\n';
+          statusMsg += `Endpoint: ${endpoint}\n`;
+          statusMsg += `Logged in: ${hasToken ? 'Yes' : 'No'}\n`;
+          statusMsg += `Machine ID: ${machineId}\n\n`;
+
+          if (!hasToken) {
+            statusMsg += 'Run /login <token> to connect to MCP.';
+          } else if (mcpStatus === 'connected') {
+            statusMsg += 'Connected. Run "puzld serve --mcp" in another terminal to start the bridge.';
+          } else {
+            statusMsg += 'Token saved but not connected. MCP server may be offline.';
+          }
+
+          addMessage(statusMsg);
+        } else {
+          addMessage('Usage: /mcp [status]\n\nShow MCP connection status.');
+        }
+        break;
+      }
 
       case 'trusted': {
         const subCmd = rest.trim().split(/\s+/)[0] || '';
@@ -3543,7 +3663,7 @@ Compare View:
 
       {/* Status Bar - hidden in collaboration/compare mode */}
       {mode !== 'collaboration' && mode !== 'compare' && (
-        <StatusBar agent={currentAgent} messageCount={messages.length} tokens={tokens} />
+        <StatusBar agent={currentAgent} messageCount={messages.length} tokens={tokens} mcpStatus={mcpStatus} />
       )}
     </Box>
   );

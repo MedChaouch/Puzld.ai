@@ -433,7 +433,7 @@ async function executeStepOnce(
     }
   }
 
-  const result = await runAdapter(agent, prompt, config, step.id);
+  const result = await runAdapter(agent, prompt, config, step.id, step.model);
 
   return {
     stepId: step.id,
@@ -451,7 +451,8 @@ async function runAdapter(
   agent: AgentName,
   prompt: string,
   config: ExecutorConfig,
-  stepId: string
+  stepId: string,
+  model?: string
 ): Promise<{ content: string; model: string; error?: string }> {
   const adapter = adapters[agent];
 
@@ -473,6 +474,7 @@ async function runAdapter(
   try {
     const result = await Promise.race([
       adapter.run(prompt, {
+        model,  // Pass model to adapter
         signal: config.signal,
         onChunk: config.onChunk
           ? (chunk: string) => config.onChunk?.(stepId, chunk)
@@ -489,7 +491,7 @@ async function runAdapter(
   } catch (err) {
     return {
       content: '',
-      model: agent,
+      model: model || agent,
       error: (err as Error).message
     };
   }
@@ -511,6 +513,11 @@ function getFinalOutput(results: StepResult[], plan: ExecutionPlan): string | un
     if (selected?.content) {
       return selected.content;
     }
+  }
+
+  // For compare mode without pick, return undefined to let caller format individual responses
+  if (plan.mode === 'compare') {
+    return undefined;
   }
 
   // For pipeline, return last step's content

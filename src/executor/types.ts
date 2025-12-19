@@ -42,6 +42,7 @@ export interface PlanStep {
   agent: AgentName | 'auto';
   action: StepAction;
   prompt: string;                  // Can contain {{variables}}
+  model?: string;                  // Specific model to use (optional)
   dependsOn?: string[];            // Step IDs this depends on
   fallback?: AgentName;            // Fallback agent if primary fails
   retries?: number;                // Max retry attempts (default: 0)
@@ -114,6 +115,7 @@ export interface ExecutorConfig {
 // Compare mode options
 export interface CompareOptions {
   agents: AgentName[];
+  models?: string[];               // Optional models for each agent (maps by index)
   sequential?: boolean;            // Run one at a time
   pick?: boolean;                  // Select best response
   pickCriteria?: string;           // How to pick (e.g., "longest", "llm")

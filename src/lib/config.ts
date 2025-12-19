@@ -18,6 +18,17 @@ export interface PulzdConfig {
   };
   api: { port: number; host: string };
   ttyd: { port: number; enabled: boolean };
+  // MCP Cloud integration
+  cloud?: {
+    endpoint: string;      // MCP server URL
+    token?: string;        // JWT from login
+    machineId?: string;    // Generated on first registration
+  };
+  // MCP Bridge settings
+  mcp?: {
+    port: number;          // Local bridge port (default: 9234)
+    host: string;          // Local bridge host (default: 127.0.0.1)
+  };
 }
 
 const CONFIG_DIR = join(homedir(), '.puzldai');
@@ -40,7 +51,14 @@ const DEFAULT_CONFIG: PulzdConfig = {
     mistral: { enabled: true, path: 'vibe' }
   },
   api: { port: 3000, host: '0.0.0.0' },
-  ttyd: { port: 3001, enabled: true }
+  ttyd: { port: 3001, enabled: true },
+  cloud: {
+    endpoint: 'https://puzld-mcp.med-ch-mu.workers.dev'
+  },
+  mcp: {
+    port: 9234,
+    host: '127.0.0.1'
+  }
 };
 
 export function getConfigDir(): string {

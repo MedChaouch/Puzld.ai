@@ -47,7 +47,7 @@ export const geminiAdapter: Adapter = {
       }
       args.push(prompt);
 
-      const { stdout, stderr } = await execa(
+      const { stdout, stderr, exitCode } = await execa(
         config.adapters.gemini.path,
         args,
         {
@@ -59,6 +59,13 @@ export const geminiAdapter: Adapter = {
       );
 
       const modelName = model ? `gemini/${model}` : 'gemini';
+
+      // Debug logging for compare mode issues
+      if (config.logLevel === 'debug') {
+        console.log(`[gemini] exitCode=${exitCode} stdout.length=${stdout?.length || 0} stderr.length=${stderr?.length || 0}`);
+        if (stderr) console.log(`[gemini] stderr: ${stderr.slice(0, 200)}`);
+        if (!stdout) console.log(`[gemini] stdout is empty!`);
+      }
 
       if (stderr && !stdout) {
         return {
@@ -92,8 +99,12 @@ export const geminiAdapter: Adapter = {
             output: outputTokens
           } : undefined
         };
-      } catch {
+      } catch (parseErr) {
         // Fallback if JSON parsing fails
+        if (config.logLevel === 'debug') {
+          console.log(`[gemini] JSON parse failed: ${parseErr}`);
+          console.log(`[gemini] Raw stdout: ${stdout?.slice(0, 500)}`);
+        }
         return {
           content: stdout || '',
           model: modelName,
