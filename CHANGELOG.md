@@ -6,6 +6,25 @@ All notable changes to PuzldAI will be documented in this file.
 
 ---
 
+## [0.2.95] - 2025-01-01
+
+### Added
+- **CLI Browser Login** - Secure browser-based authentication flow
+  - `puzld login` opens browser for approval (like Vercel/Railway CLI)
+  - Polls for approval status with spinner animation
+  - Ctrl+C cancels and cleans up pending session
+  - `--token pk_xxx` still available for headless/CI machines
+
+### Changed
+- Auth headers now properly handle API keys (pk_xxx) vs JWTs
+- WebSocket connection passes API key in query param (CF Workers limitation)
+- Registration/heartbeat/unregister use correct endpoints
+
+### Fixed
+- Claude adapter adds `--no-session-persistence` to avoid polluting Claude Code's session list
+
+---
+
 ## [0.2.93] - 2025-12-21
 
 ### Changed
