@@ -14,6 +14,18 @@ import type {
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
+ * Build auth headers based on token type
+ * - API keys (pk_xxx) use X-PUZLD-API-KEY header
+ * - JWTs use Authorization: Bearer header
+ */
+function getAuthHeaders(token: string): Record<string, string> {
+  if (token.startsWith('pk_')) {
+    return { 'X-PUZLD-API-KEY': token };
+  }
+  return { 'Authorization': `Bearer ${token}` };
+}
+
+/**
  * Register this Core instance with MCP server
  */
 export async function registerWithMCP(
@@ -37,7 +49,7 @@ export async function registerWithMCP(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      ...getAuthHeaders(token)
     },
     body: JSON.stringify(request)
   });
@@ -63,11 +75,11 @@ export async function sendHeartbeat(machineId: string): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`${endpoint}/heartbeat`, {
+    const response = await fetch(`${endpoint}/register/heartbeat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        ...getAuthHeaders(token)
       },
       body: JSON.stringify({ machineId })
     });
@@ -117,11 +129,11 @@ export async function unregisterFromMCP(machineId: string): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`${endpoint}/unregister`, {
-      method: 'POST',
+    const response = await fetch(`${endpoint}/register`, {
+      method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        ...getAuthHeaders(token)
       },
       body: JSON.stringify({ machineId })
     });

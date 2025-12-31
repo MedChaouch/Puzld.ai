@@ -275,7 +275,7 @@ observeCmd
 program
   .command('login')
   .description('Login to PuzldAI MCP server')
-  .option('-t, --token <token>', 'API token (or enter interactively)')
+  .option('-t, --token <token>', 'API key (pk_xxx) from dashboard')
   .option('-e, --endpoint <url>', 'MCP server endpoint')
   .action((opts) => loginCommand({
     token: opts.token,

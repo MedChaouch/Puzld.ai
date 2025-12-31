@@ -31,6 +31,18 @@ import type { CoreCapabilities, ExecutionPlan } from './types';
 
 import { createHmac, createHash } from 'crypto';
 
+/**
+ * Build auth headers based on token type
+ * - API keys (pk_xxx) use X-PUZLD-API-KEY header
+ * - JWTs use Authorization: Bearer header
+ */
+function getAuthHeaders(token: string): Record<string, string> {
+  if (token.startsWith('pk_')) {
+    return { 'X-PUZLD-API-KEY': token };
+  }
+  return { 'Authorization': `Bearer ${token}` };
+}
+
 // Execution timeout (10 minutes hard kill)
 const EXECUTION_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -597,7 +609,11 @@ export async function connectToMCP(): Promise<void> {
 
   // Convert https:// to wss:// for WebSocket
   const wsEndpoint = endpoint.replace(/^https?:\/\//, 'wss://');
-  const wsUrl = `${wsEndpoint}/bridge?machineId=${encodeURIComponent(machineId)}`;
+  // NOTE: Cloudflare Workers doesn't forward custom headers on WebSocket upgrades
+  // So we pass API key as query param (server accepts apiKey query param as fallback)
+  const wsUrl = token.startsWith('pk_')
+    ? `${wsEndpoint}/bridge?machineId=${encodeURIComponent(machineId)}&apiKey=${encodeURIComponent(token)}`
+    : `${wsEndpoint}/bridge?machineId=${encodeURIComponent(machineId)}`;
 
   // Increment connection nonce to invalidate zombie handlers
   const thisConnectionNonce = ++connectionNonce;
@@ -606,9 +622,7 @@ export async function connectToMCP(): Promise<void> {
 
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(wsUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers: getAuthHeaders(token)
     });
 
     ws.on('open', async () => {

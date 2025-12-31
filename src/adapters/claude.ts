@@ -39,7 +39,8 @@ export const claudeAdapter: Adapter & {
     try {
       // claude -p "prompt" for non-interactive output
       // --output-format stream-json for faster response (requires --verbose)
-      const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose'];
+      // --no-session-persistence to avoid polluting Claude Code's session list
+      const args = ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--no-session-persistence'];
 
       // Disable native tools for agentic mode (LLM returns JSON, we apply files)
       if (disableTools) {
@@ -135,11 +136,13 @@ export const claudeAdapter: Adapter & {
     try {
       // Use --permission-mode default to capture Write/Edit attempts
       // WITHOUT --tools "" so Claude can actually try to use tools
+      // --no-session-persistence to avoid polluting Claude Code's session list
       const args = [
         '-p', prompt,
         '--output-format', 'stream-json',
         '--verbose',
-        '--permission-mode', 'default'
+        '--permission-mode', 'default',
+        '--no-session-persistence'
       ];
       if (model) {
         args.push('--model', model);
