@@ -100,15 +100,13 @@ program
   .option('-t, --terminal-port <port>', 'Terminal port (default: 3001)')
   .option('--mcp', 'Start MCP bridge server instead of API server')
   .option('--mcp-port <port>', 'MCP bridge port (default: 9234)')
-  .option('--local', 'Force local HTTP bridge (no cloud WebSocket)')
   .action((opts) => serveCommand({
     port: parseInt(opts.port, 10),
     host: opts.host,
     web: opts.web,
     terminalPort: opts.terminalPort ? parseInt(opts.terminalPort, 10) : undefined,
     mcp: opts.mcp,
-    mcpPort: opts.mcpPort ? parseInt(opts.mcpPort, 10) : undefined,
-    local: opts.local
+    mcpPort: opts.mcpPort ? parseInt(opts.mcpPort, 10) : undefined
   }));
 
 program

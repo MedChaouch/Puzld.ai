@@ -1,8 +1,14 @@
 /**
- * MCP Bridge Server
+ * MCP Bridge Server (DEPRECATED)
  *
- * Local Hono server that receives intents from MCP and executes them.
- * Runs on localhost:9234 (configurable).
+ * @deprecated This local HTTP bridge is deprecated and should not be used.
+ * MCP is cloud-only to enforce auth, quotas, and billing.
+ * Use WebSocket connection via ws-client.ts instead.
+ *
+ * See: SECURITY.md → "Local Bypass Prevention"
+ *
+ * This file is kept for reference but startBridge() should never be called.
+ * All MCP traffic must route through cloud (api.puzld.cc).
  */
 
 import { Hono } from 'hono';
